@@ -1,0 +1,16 @@
+# Visual Studio / Rider
+.vs/
+.idea/
+*.user
+*.suo
+
+# Build outputs
+bin/
+obj/
+
+# VSCode
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db

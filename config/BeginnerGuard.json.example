@@ -1,0 +1,13 @@
+{
+  "Steam API Key": "YOUR_STEAM_API_KEY_HERE",
+  "Max allowed Rust playtime on Steam (hours)": 1000,
+  "Private profile: max cumulative server playtime before kick (minutes)": 120,
+  "Steam API periodic check interval (seconds)": 1800.0,
+  "Steam API retry interval on failure (seconds)": 1800.0,
+  "Over-limit player: delay before kick after warning (seconds)": 300.0,
+  "Private profile: delay before kick after warning (seconds)": 300.0,
+  "Private profile: max warning kicks before BAN": 2,
+  "BAN duration (seconds)": 86400.0,
+  "Skip checks for Oxide admins": true,
+  "Enable debug logging": false
+}

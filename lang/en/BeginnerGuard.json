@@ -1,0 +1,10 @@
+{
+  "PrivateProfile.GraceWarn": "<color=#FFA500>[BeginnerGuard] Your Steam profile is set to private.\nYou will be kicked in approximately {0} minute(s) if it remains private.\nHow to fix: Steam → Profile → Edit Profile → Privacy Settings → set to Public.</color>",
+  "PrivateProfile.GraceKickReason": "[BeginnerGuard] Kicked: cumulative server playtime limit reached.\nPlease set your Steam profile to public and reconnect.",
+  "PrivateProfile.WarnKick": "<color=#FFA500>[BeginnerGuard] Your Steam profile is private!\nPlease set it to public within {0}s.\nWarning {1}/{2} — a {3}h BAN will be issued if you exceed this.\nHow to fix: Steam → Profile → Edit Profile → Privacy Settings → Public.</color>",
+  "PrivateProfile.WarnKickReason": "[BeginnerGuard] Kicked: Steam profile is private.\nPlease set your profile to public and reconnect.",
+  "PrivateProfile.BanKickReason": "[BeginnerGuard] You have been banned for {0} hour(s).\nReason: Steam profile remained private after repeated warnings.\nPlease set your Steam profile to public before reconnecting.\nHow to fix: Steam → Profile → Edit Profile → Privacy Settings → Public.",
+  "PrivateProfile.BanConnectKick": "[BeginnerGuard] You are banned. Ban expires in: {0}h {1}m\nPlease set your Steam profile to public before reconnecting.",
+  "OverLimit.Warn": "<color=#FFA500>[BeginnerGuard] This is a beginner-only server.\nYour Rust playtime on Steam: {0}h (limit: {1}h).\nYou will be kicked in {2}s. Please find a server that matches your experience level.</color>",
+  "OverLimit.KickReason": "[BeginnerGuard] Kicked: playtime too high ({0}h / limit {1}h).\nThis server is for beginners only. Thanks for understanding!"
+}
