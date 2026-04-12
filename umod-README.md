@@ -10,14 +10,12 @@ Everything is configurable — playtime cap, grace period, kick delays, BAN dura
 
 ## How Players Are Handled
 
-| Situation | What Happens |
-|-----------|-------------|
-| Hours ≤ limit, public profile | Allowed in |
-| Hours > limit | Chat warning → kicked after delay |
-| Private profile, within grace period | Chat warning + kick scheduled at grace expiry |
-| Private profile, over grace (warnings remaining) | Warning kick |
-| Private profile, warnings exhausted | Temporary BAN |
-| Reconnecting while BAN'd | Instant kick showing time remaining |
+- **Hours ≤ limit, public profile** — Allowed in
+- **Hours > limit** — Chat warning → kicked after delay
+- **Private profile, within grace period** — Chat warning + kick scheduled at grace expiry
+- **Private profile, over grace (warnings remaining)** — Warning kick
+- **Private profile, warnings exhausted** — Temporary BAN
+- **Reconnecting while BAN'd** — Instant kick showing time remaining
 
 ---
 
@@ -50,28 +48,24 @@ A free **Steam Web API key** is required: https://steamcommunity.com/dev/apikey
 
 ## Configuration
 
-| Setting | Default | Description |
-|---------|---------|-------------|
-| Steam API Key | *(required)* | Your Steam Web API key |
-| Max allowed Rust playtime (hours) | `1000` | Players above this are kicked |
-| Private profile grace period (minutes) | `120` | Total server time allowed for private-profile players |
-| Periodic check interval (seconds) | `1800` | How often online players are re-checked (30 min) |
-| API retry interval on failure (seconds) | `1800` | Retry delay when Steam API is unreachable |
-| Over-limit kick delay (seconds) | `300` | Delay between chat warning and kick |
-| Private profile kick delay (seconds) | `300` | Delay between chat warning and kick |
-| Warning kicks before BAN | `2` | How many warning kicks before a BAN is issued |
-| BAN duration (seconds) | `86400` | BAN length (default: 24 hours) |
-| Skip checks for Oxide admins | `true` | Auto-exempt server admins |
-| Enable debug logging | `false` | Verbose output to server console |
+- **Steam API Key** *(required)* — Your Steam Web API key
+- **Max allowed Rust playtime (hours)** — default `1000` — Players above this are kicked
+- **Private profile grace period (minutes)** — default `120` — Total server time allowed for private-profile players
+- **Periodic check interval (seconds)** — default `1800` — How often online players are re-checked (30 min)
+- **API retry interval on failure (seconds)** — default `1800` — Retry delay when Steam API is unreachable
+- **Over-limit kick delay (seconds)** — default `300` — Delay between chat warning and kick
+- **Private profile kick delay (seconds)** — default `300` — Delay between chat warning and kick
+- **Warning kicks before BAN** — default `2` — How many warning kicks before a BAN is issued
+- **BAN duration (seconds)** — default `86400` — BAN length (default: 24 hours)
+- **Skip checks for Oxide admins** — default `true` — Auto-exempt server admins
+- **Enable debug logging** — default `false` — Verbose output to server console
 
 ---
 
 ## Permissions
 
-| Permission | Effect |
-|------------|--------|
-| `beginnerguard.exempt` | Skip all checks — for VIPs and trusted regulars |
-| `beginnerguard.admin` | Use `bg.*` commands from the in-game F1 console |
+- `beginnerguard.exempt` — Skip all checks — for VIPs and trusted regulars
+- `beginnerguard.admin` — Use `bg.*` commands from the in-game F1 console
 
 ```
 oxide.grant group  <group>      beginnerguard.exempt
@@ -86,14 +80,12 @@ oxide.grant user   <SteamID64>  beginnerguard.exempt
 All commands work from the **server console / RCON** without permissions.  
 Requires `beginnerguard.admin` when used from the **in-game F1 console**.
 
-| Command | Description |
-|---------|-------------|
-| `bg.help` | Show command list |
-| `bg.check <SteamID64>` | View a player's stored record |
-| `bg.unban <SteamID64>` | Lift an active BAN |
-| `bg.forcecheck <SteamID64>` | Force an immediate Steam API check (player must be online) |
-| `bg.reset <SteamID64>` | Clear all stored data for a player |
-| `bg.debug <on\|off>` | Toggle debug logging without a reload |
+- `bg.help` — Show command list
+- `bg.check <SteamID64>` — View a player's stored record
+- `bg.unban <SteamID64>` — Lift an active BAN
+- `bg.forcecheck <SteamID64>` — Force an immediate Steam API check (player must be online)
+- `bg.reset <SteamID64>` — Clear all stored data for a player
+- `bg.debug <on|off>` — Toggle debug logging without a reload
 
 ---
 
