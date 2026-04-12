@@ -104,3 +104,11 @@ Language files are stored in `oxide/lang/{code}/BeginnerGuard.json` and auto-gen
 **Built-in:** English (`en`), Japanese (`ja`)
 
 To add a new language, copy `oxide/lang/en/BeginnerGuard.json` to `oxide/lang/<code>/BeginnerGuard.json`, translate the values (do not change the keys), and reload.
+
+---
+
+## Source & Contributing
+
+Source code is available on GitHub: https://github.com/mazurk4/rust-game-beginnerguard
+
+Bug reports, feature requests, and pull requests are welcome — feel free to open an issue or submit a PR.
