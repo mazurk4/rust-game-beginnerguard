@@ -1,34 +1,50 @@
 ## Overview
 
-**BeginnerGuard** protects beginner-only Rust servers by automatically checking each player's Steam Rust playtime via the Steam Web API. Players who exceed the configured hour limit — or who hide their playtime behind a private Steam profile — are warned in chat and kicked (or banned after repeated violations).
+**Beginner Guard** automatically keeps over-experienced players off your beginner server.
+
+On connect, each player's Rust playtime is fetched from the Steam Web API. Players over the configured hour limit are warned in chat and kicked after a delay. Players hiding their stats with a private Steam profile are handled separately: they receive a grace period, then escalating warning kicks, and finally a temporary BAN if they keep reconnecting without fixing their privacy settings.
+
+Everything is configurable — playtime cap, grace period, kick delays, BAN duration — with no hard-coded values.
+
+---
+
+## How Players Are Handled
+
+| Situation | What Happens |
+|-----------|-------------|
+| Hours ≤ limit, public profile | Allowed in |
+| Hours > limit | Chat warning → kicked after delay |
+| Private profile, within grace period | Chat warning + kick scheduled at grace expiry |
+| Private profile, over grace (warnings remaining) | Warning kick |
+| Private profile, warnings exhausted | Temporary BAN |
+| Reconnecting while BAN'd | Instant kick showing time remaining |
 
 ---
 
 ## Features
 
-- **Playtime check on connect** — fetches Steam Rust hours for every joining player
-- **Over-limit kick** — configurable playtime cap; warns in chat then kicks after a delay
-- **Private profile protection** — grace period allows short visits, then escalates to warning kicks and finally a time-limited BAN
-- **Automatic BAN expiry** — bans lift themselves; no admin action needed
-- **Exempt permission** — whitelist VIPs, staff, or trusted players with `beginguard.exempt`
-- **Periodic re-check** — re-validates all online players at a configurable interval
-- **Colored chat warnings** — in-game messages rendered in orange for visibility
-- **Multi-language support** — English and Japanese built-in; add any language via `oxide/lang/`
+- Playtime gate with configurable hour cap
+- Private profile: grace period → warning kicks → time-limited BAN
+- Automatic BAN expiry — no manual cleanup needed
+- `beginguard.exempt` permission to whitelist VIPs and trusted players
+- Periodic re-check of all online players
+- Orange colored chat warnings (`#FFA500`) for easy visibility
+- Multi-language — English and Japanese built-in; add more via `oxide/lang/`
 
 ---
 
 ## Requirements
 
-- A free **Steam Web API key**: https://steamcommunity.com/dev/apikey
+A free **Steam Web API key** is required: https://steamcommunity.com/dev/apikey
 
 ---
 
 ## Installation
 
 1. Upload `BeginnerGuard.cs` to `oxide/plugins/`
-2. Restart the server or run `oxide.reload BeginnerGuard`
-3. Set your Steam API key in `oxide/config/BeginnerGuard.json`
-4. Reload: `oxide.reload BeginnerGuard`
+2. Run `oxide.reload BeginnerGuard`
+3. Open `oxide/config/BeginnerGuard.json` — set `"Steam API Key"` to your key
+4. Run `oxide.reload BeginnerGuard` again
 
 ---
 
@@ -37,15 +53,16 @@
 | Setting | Default | Description |
 |---------|---------|-------------|
 | Steam API Key | *(required)* | Your Steam Web API key |
-| Max allowed Rust playtime (hours) | `1000` | Players above this cap are kicked |
-| Private profile grace period (minutes) | `120` | Cumulative server time allowed before kick |
-| Periodic check interval (seconds) | `1800` | How often to re-check online players |
-| Over-limit kick delay (seconds) | `300` | Time between warning and kick for over-limit players |
-| Private profile kick delay (seconds) | `300` | Time between warning and kick for private profiles |
+| Max allowed Rust playtime (hours) | `1000` | Players above this are kicked |
+| Private profile grace period (minutes) | `120` | Total server time allowed for private-profile players |
+| Periodic check interval (seconds) | `1800` | How often online players are re-checked (30 min) |
+| API retry interval on failure (seconds) | `1800` | Retry delay when Steam API is unreachable |
+| Over-limit kick delay (seconds) | `300` | Delay between chat warning and kick |
+| Private profile kick delay (seconds) | `300` | Delay between chat warning and kick |
 | Warning kicks before BAN | `2` | How many warning kicks before a BAN is issued |
-| BAN duration (seconds) | `86400` | BAN length (default: 24 h) |
+| BAN duration (seconds) | `86400` | BAN length (default: 24 hours) |
 | Skip checks for Oxide admins | `true` | Auto-exempt server admins |
-| Enable debug logging | `false` | Verbose server console output |
+| Enable debug logging | `false` | Verbose output to server console |
 
 ---
 
@@ -53,37 +70,37 @@
 
 | Permission | Effect |
 |------------|--------|
-| `beginguard.exempt` | Bypass all checks |
-| `beginguard.admin` | Use `bg.*` commands from in-game console |
+| `beginguard.exempt` | Skip all checks — for VIPs and trusted regulars |
+| `beginguard.admin` | Use `bg.*` commands from the in-game F1 console |
+
+```
+oxide.grant group  <group>      beginguard.exempt
+oxide.grant group  <group>      beginguard.admin
+oxide.grant user   <SteamID64>  beginguard.exempt
+```
 
 ---
 
 ## Commands
 
+All commands work from the **server console / RCON** without permissions.  
+Requires `beginguard.admin` when used from the **in-game F1 console**.
+
 | Command | Description |
 |---------|-------------|
-| `bg.help` | List all commands |
+| `bg.help` | Show command list |
 | `bg.check <SteamID64>` | View a player's stored record |
 | `bg.unban <SteamID64>` | Lift an active BAN |
-| `bg.forcecheck <SteamID64>` | Force an immediate Steam API check |
+| `bg.forcecheck <SteamID64>` | Force an immediate Steam API check (player must be online) |
 | `bg.reset <SteamID64>` | Clear all stored data for a player |
-| `bg.debug <on\|off>` | Toggle debug logging at runtime |
+| `bg.debug <on\|off>` | Toggle debug logging without a reload |
 
 ---
 
 ## Localization
 
-Language files live in `oxide/lang/{code}/BeginnerGuard.json` and are generated automatically on first load.
+Language files are stored in `oxide/lang/{code}/BeginnerGuard.json` and auto-generated on first load.
 
-**Built-in languages:** English (`en`), Japanese (`ja`)
+**Built-in:** English (`en`), Japanese (`ja`)
 
-To add a new language, copy `oxide/lang/en/BeginnerGuard.json` to `oxide/lang/<code>/BeginnerGuard.json`, translate the values, and reload the plugin.
-
----
-
-## License
-
-GPL v3 — Copyright (C) 2024 Mazurk4_
-
-You may use, modify, and redistribute this plugin. Any distributed modified version
-must also be published under GPL v3 with the original copyright notice intact.
+To add a new language, copy `oxide/lang/en/BeginnerGuard.json` to `oxide/lang/<code>/BeginnerGuard.json`, translate the values (do not change the keys), and reload.

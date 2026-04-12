@@ -32,4 +32,4 @@ If a PR goes quiet for a while, feel free to ping via a comment.
 ## License
 
 By submitting a pull request, you agree that your contribution will be licensed
-under the same **GPL v3** license as this project.
+under the same **MIT** license as this project.
