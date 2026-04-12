@@ -12,15 +12,15 @@ namespace Oxide.Plugins
         // ---------------------------------------------------------------
         // Permissions
         //
-        //  beginguard.exempt  - Skip all checks (whitelist equivalent)
-        //  beginguard.admin   - Use management console commands
+        //  beginnerguard.exempt  - Skip all checks (whitelist equivalent)
+        //  beginnerguard.admin   - Use management console commands
         //
-        // Grant to a group:  oxide.grant group <group> beginguard.exempt
-        // Grant to a user:   oxide.grant user  <sid>   beginguard.admin
-        // Revoke:            oxide.revoke group <group> beginguard.exempt
+        // Grant to a group:  oxide.grant group <group> beginnerguard.exempt
+        // Grant to a user:   oxide.grant user  <sid>   beginnerguard.admin
+        // Revoke:            oxide.revoke group <group> beginnerguard.exempt
         // ---------------------------------------------------------------
-        private const string PermExempt = "beginguard.exempt";
-        private const string PermAdmin  = "beginguard.admin";
+        private const string PermExempt = "beginnerguard.exempt";
+        private const string PermAdmin  = "beginnerguard.admin";
 
         // ---------------------------------------------------------------
         // Configuration
@@ -517,10 +517,10 @@ namespace Oxide.Plugins
 
         // ---------------------------------------------------------------
         // Console Commands  (server console / RCON = always allowed)
-        //                   (in-game console   = requires beginguard.admin)
+        //                   (in-game console   = requires beginnerguard.admin)
         //
-        // Grant:   oxide.grant group moderator beginguard.admin
-        // Revoke:  oxide.revoke group moderator beginguard.admin
+        // Grant:   oxide.grant group moderator beginnerguard.admin
+        // Revoke:  oxide.revoke group moderator beginnerguard.admin
         // ---------------------------------------------------------------
 
         [ConsoleCommand("bg.help")]

@@ -26,7 +26,7 @@ Everything is configurable — playtime cap, grace period, kick delays, BAN dura
 - Playtime gate with configurable hour cap
 - Private profile: grace period → warning kicks → time-limited BAN
 - Automatic BAN expiry — no manual cleanup needed
-- `beginguard.exempt` permission to whitelist VIPs and trusted players
+- `beginnerguard.exempt` permission to whitelist VIPs and trusted players
 - Periodic re-check of all online players
 - Orange colored chat warnings (`#FFA500`) for easy visibility
 - Multi-language — English and Japanese built-in; add more via `oxide/lang/`
@@ -70,13 +70,13 @@ A free **Steam Web API key** is required: https://steamcommunity.com/dev/apikey
 
 | Permission | Effect |
 |------------|--------|
-| `beginguard.exempt` | Skip all checks — for VIPs and trusted regulars |
-| `beginguard.admin` | Use `bg.*` commands from the in-game F1 console |
+| `beginnerguard.exempt` | Skip all checks — for VIPs and trusted regulars |
+| `beginnerguard.admin` | Use `bg.*` commands from the in-game F1 console |
 
 ```
-oxide.grant group  <group>      beginguard.exempt
-oxide.grant group  <group>      beginguard.admin
-oxide.grant user   <SteamID64>  beginguard.exempt
+oxide.grant group  <group>      beginnerguard.exempt
+oxide.grant group  <group>      beginnerguard.admin
+oxide.grant user   <SteamID64>  beginnerguard.exempt
 ```
 
 ---
@@ -84,7 +84,7 @@ oxide.grant user   <SteamID64>  beginguard.exempt
 ## Commands
 
 All commands work from the **server console / RCON** without permissions.  
-Requires `beginguard.admin` when used from the **in-game F1 console**.
+Requires `beginnerguard.admin` when used from the **in-game F1 console**.
 
 | Command | Description |
 |---------|-------------|

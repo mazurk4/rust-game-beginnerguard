@@ -88,13 +88,13 @@
 
 | パーミッション | 効果 |
 |----------------|------|
-| `beginguard.exempt` | 全チェックをスキップ（VIP・スタッフ向け） |
-| `beginguard.admin` | ゲーム内 F1 コンソールから `bg.*` コマンドを使用可能 |
+| `beginnerguard.exempt` | 全チェックをスキップ（VIP・スタッフ向け） |
+| `beginnerguard.admin` | ゲーム内 F1 コンソールから `bg.*` コマンドを使用可能 |
 
 ```
-oxide.grant group  <グループ名>  beginguard.exempt
-oxide.grant group  <グループ名>  beginguard.admin
-oxide.grant user   <SteamID64>  beginguard.exempt
+oxide.grant group  <グループ名>  beginnerguard.exempt
+oxide.grant group  <グループ名>  beginnerguard.admin
+oxide.grant user   <SteamID64>  beginnerguard.exempt
 ```
 
 ---
@@ -102,7 +102,7 @@ oxide.grant user   <SteamID64>  beginguard.exempt
 ## コンソールコマンド
 
 **サーバーコンソール / RCON** からはパーミッションなしで使用できます。  
-**ゲーム内 F1 コンソール**から使用するには `beginguard.admin` が必要です。
+**ゲーム内 F1 コンソール**から使用するには `beginnerguard.admin` が必要です。
 
 | コマンド | 説明 |
 |---------|------|
@@ -120,7 +120,7 @@ oxide.grant user   <SteamID64>  beginguard.exempt
 ```
 プレイヤー接続
     │
-    ├─ 免除対象（管理者 / beginguard.exempt）?  → 入場
+    ├─ 免除対象（管理者 / beginnerguard.exempt）?  → 入場
     ├─ BAN 中?                                  → キック（残り時間を表示）
     │
     └─ Steam API でプレイ時間を取得

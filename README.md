@@ -90,13 +90,13 @@ See [`config/BeginnerGuard.json.example`](config/BeginnerGuard.json.example) for
 
 | Permission | Effect |
 |------------|--------|
-| `beginguard.exempt` | Skip all checks — for VIPs and trusted players |
-| `beginguard.admin` | Use `bg.*` commands from the in-game F1 console |
+| `beginnerguard.exempt` | Skip all checks — for VIPs and trusted players |
+| `beginnerguard.admin` | Use `bg.*` commands from the in-game F1 console |
 
 ```
-oxide.grant group  <group>      beginguard.exempt
-oxide.grant group  <group>      beginguard.admin
-oxide.grant user   <SteamID64>  beginguard.exempt
+oxide.grant group  <group>      beginnerguard.exempt
+oxide.grant group  <group>      beginnerguard.admin
+oxide.grant user   <SteamID64>  beginnerguard.exempt
 ```
 
 ---
@@ -104,7 +104,7 @@ oxide.grant user   <SteamID64>  beginguard.exempt
 ## Commands
 
 Available from the **server console / RCON** without any permissions.  
-Requires `beginguard.admin` when used from the **in-game F1 console**.
+Requires `beginnerguard.admin` when used from the **in-game F1 console**.
 
 | Command | Description |
 |---------|-------------|
@@ -122,7 +122,7 @@ Requires `beginguard.admin` when used from the **in-game F1 console**.
 ```
 Player connects
     │
-    ├─ Exempt (admin / beginguard.exempt)?  → Allow
+    ├─ Exempt (admin / beginnerguard.exempt)?  → Allow
     ├─ Currently BAN'd?                     → Kick (shows time remaining)
     │
     └─ Fetch Steam API
