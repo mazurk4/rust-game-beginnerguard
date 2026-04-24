@@ -5,7 +5,7 @@ using Oxide.Core;
 
 namespace Oxide.Plugins
 {
-    [Info("Beginner Guard", "Mazurk4_", "1.4.0")]
+    [Info("Beginner Guard", "Mazurk4_", "1.5.0")]
     [Description("Beginner server protection - restricts players by Rust Steam playtime")]
     public class BeginnerGuard : RustPlugin
     {
@@ -61,6 +61,15 @@ namespace Oxide.Plugins
 
             [JsonProperty("Enable debug logging")]
             public bool DebugLogging { get; set; } = false;
+
+            [JsonProperty("Deferred data save (true = periodic timer, false = save on every change)")]
+            public bool DeferredSave { get; set; } = false;
+
+            [JsonProperty("Data save interval (seconds) — used only when Deferred data save is true")]
+            public float DataSaveIntervalSeconds { get; set; } = 300f;
+
+            [JsonProperty("Stale record prune age (days, 0 = disabled)")]
+            public int StaleRecordPruneAgeDays { get; set; } = 90;
         }
 
         protected override void LoadDefaultConfig()
@@ -142,6 +151,8 @@ namespace Oxide.Plugins
             public long   BannedUntilTicks      { get; set; } = 0;
             // LastSteamCheck stored as UTC ticks; 0 = never checked
             public long   LastSteamCheckTicks   { get; set; } = 0;
+            // LastSeen stored as UTC ticks of last disconnect; 0 = no disconnect recorded yet
+            public long   LastSeenTicks         { get; set; } = 0;
 
             // ---- helpers (not serialised) ----
             [JsonIgnore] public DateTime? LastJoinTime
@@ -158,6 +169,11 @@ namespace Oxide.Plugins
             {
                 get => LastSteamCheckTicks > 0 ? new DateTime(LastSteamCheckTicks, DateTimeKind.Utc) : DateTime.MinValue;
                 set => LastSteamCheckTicks = value.Ticks;
+            }
+            [JsonIgnore] public DateTime LastSeen
+            {
+                get => LastSeenTicks > 0 ? new DateTime(LastSeenTicks, DateTimeKind.Utc) : DateTime.MinValue;
+                set => LastSeenTicks = value.Ticks;
             }
         }
 
@@ -213,6 +229,8 @@ namespace Oxide.Plugins
         // Timers
         // ---------------------------------------------------------------
         private Timer _periodicCheckTimer;
+        private Timer _dataSaveTimer;
+        private bool  _dataDirty = false;
         private readonly Dictionary<string, Timer> _pendingKickTimers
             = new Dictionary<string, Timer>();
 
@@ -233,6 +251,8 @@ namespace Oxide.Plugins
 
         private void OnServerInitialized()
         {
+            PruneStaleRecords();
+
             _periodicCheckTimer = timer.Every(_config.CheckIntervalSeconds, () =>
             {
                 DebugLog("Periodic Steam check triggered.");
@@ -240,13 +260,24 @@ namespace Oxide.Plugins
                     FetchAndProcessSteamHours(player);
             });
             Puts($"Periodic check scheduled every {_config.CheckIntervalSeconds}s.");
+
+            if (_config.DeferredSave)
+            {
+                _dataSaveTimer = timer.Every(_config.DataSaveIntervalSeconds, FlushDataIfDirty);
+                Puts($"Data save: deferred (interval {_config.DataSaveIntervalSeconds}s).");
+            }
+            else
+            {
+                Puts("Data save: immediate (deferred save disabled).");
+            }
         }
 
         private void Unload()
         {
             _periodicCheckTimer?.Destroy();
+            _dataSaveTimer?.Destroy();
             foreach (var t in _pendingKickTimers.Values) t?.Destroy();
-            SaveData();
+            FlushDataIfDirty();
             Puts("BeginnerGuard unloaded.");
         }
 
@@ -275,10 +306,11 @@ namespace Oxide.Plugins
                 DebugLog($"BAN expired for {player.displayName} — lifting automatically.");
                 record.BannedUntil      = null;
                 record.PrivateKickCount = 0;
+                SaveData();  // flush BAN lift immediately
             }
 
             record.LastJoinTime = DateTime.UtcNow;
-            SaveData();
+            MarkDirty();
 
             DebugLog($"{player.displayName} connected — starting Steam check.");
             FetchAndProcessSteamHours(player);
@@ -294,10 +326,11 @@ namespace Oxide.Plugins
             double session = (DateTime.UtcNow - record.LastJoinTime.Value).TotalMinutes;
             record.ServerPlaytimeMinutes += session;
             record.LastJoinTime           = null;
+            record.LastSeen               = DateTime.UtcNow;
 
             DebugLog($"{player.displayName} disconnected — session {session:F1} min, " +
                      $"cumulative {record.ServerPlaytimeMinutes:F1} min.");
-            SaveData();
+            MarkDirty();
         }
 
         // ---------------------------------------------------------------
@@ -371,7 +404,7 @@ namespace Oxide.Plugins
                     record.SteamTotalHours  = hours;
                     record.IsProfilePrivate = false;
                     record.LastSteamCheck   = DateTime.UtcNow;
-                    SaveData();
+                    MarkDirty();
 
                     Puts($"[BeginnerGuard] {player.displayName} — Steam Rust hours: {hours}h " +
                          $"(limit: {_config.MaxSteamHours}h)");
@@ -397,7 +430,7 @@ namespace Oxide.Plugins
         {
             record.IsProfilePrivate = true;
             record.LastSteamCheck   = DateTime.UtcNow;
-            SaveData();
+            MarkDirty();
 
             double currentSession = record.LastJoinTime.HasValue
                 ? (DateTime.UtcNow - record.LastJoinTime.Value).TotalMinutes : 0.0;
@@ -425,7 +458,7 @@ namespace Oxide.Plugins
                 // Issue BAN
                 record.BannedUntil      = DateTime.UtcNow.AddSeconds(_config.BanDurationSeconds);
                 record.PrivateKickCount = 0;
-                SaveData();
+                SaveData();  // flush BAN immediately
 
                 double banHours = _config.BanDurationSeconds / 3600.0;
                 Puts($"[BeginnerGuard] BAN issued to {player.displayName} ({player.UserIDString}) " +
@@ -437,7 +470,7 @@ namespace Oxide.Plugins
             {
                 // Warning kick
                 record.PrivateKickCount++;
-                SaveData();
+                MarkDirty();
 
                 SendMsg(player, GetMsg("PrivateProfile.WarnKick", player,
                     _config.PrivateProfileKickDelaySeconds.ToString("F0"),
@@ -491,6 +524,52 @@ namespace Oxide.Plugins
             }
         }
 
+        private void MarkDirty()
+        {
+            if (_config.DeferredSave)
+                _dataDirty = true;
+            else
+                SaveData();
+        }
+
+        private void FlushDataIfDirty()
+        {
+            if (!_dataDirty) return;
+            SaveData();
+            _dataDirty = false;
+        }
+
+        private void PruneStaleRecords()
+        {
+            if (_config.StaleRecordPruneAgeDays <= 0) return;
+
+            var cutoff   = DateTime.UtcNow.AddDays(-_config.StaleRecordPruneAgeDays);
+            var toRemove = new List<string>();
+
+            foreach (var kv in _data.Players)
+            {
+                var r = kv.Value;
+                if (r.LastJoinTime.HasValue)                                    continue; // online now
+                if (r.BannedUntil.HasValue && r.BannedUntil.Value > DateTime.UtcNow) continue; // still banned
+                if (r.LastSeenTicks == 0)                                       continue; // no disconnect recorded yet (migration safety)
+                if (r.LastSeen > cutoff)                                        continue; // seen recently
+                toRemove.Add(kv.Key);
+            }
+
+            foreach (var sid in toRemove)
+                _data.Players.Remove(sid);
+
+            if (toRemove.Count > 0)
+            {
+                Puts($"[BeginnerGuard] Pruned {toRemove.Count} stale record(s) older than {_config.StaleRecordPruneAgeDays} days.");
+                SaveData();
+            }
+            else
+            {
+                DebugLog("Prune: no stale records found.");
+            }
+        }
+
         private void KickPlayer(BasePlayer player, string reason)
         {
             if (!player.IsConnected) return;
@@ -533,6 +612,7 @@ namespace Oxide.Plugins
                 "bg.unban      <SteamID64>  Lift an active BAN\n" +
                 "bg.forcecheck <SteamID64>  Force an immediate Steam API check (player must be online)\n" +
                 "bg.reset      <SteamID64>  Reset all stored data for a player\n" +
+                "bg.prune                   Remove stale records older than configured age\n" +
                 "bg.debug      <on|off>     Toggle debug logging at runtime\n" +
                 "bg.help                    Show this help\n" +
                 "\n" +
@@ -641,6 +721,16 @@ namespace Oxide.Plugins
             {
                 arg.ReplyWith($"No record found for {sid}.");
             }
+        }
+
+        [ConsoleCommand("bg.prune")]
+        private void CmdPrune(ConsoleSystem.Arg arg)
+        {
+            if (!HasAdminPerm(arg)) return;
+            int before = _data.Players.Count;
+            PruneStaleRecords();
+            int after  = _data.Players.Count;
+            arg.ReplyWith($"[BeginnerGuard] Prune complete — removed {before - after} record(s), {after} remain.");
         }
 
         [ConsoleCommand("bg.debug")]
