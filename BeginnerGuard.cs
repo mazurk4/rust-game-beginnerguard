@@ -62,7 +62,10 @@ namespace Oxide.Plugins
             [JsonProperty("Enable debug logging")]
             public bool DebugLogging { get; set; } = false;
 
-            [JsonProperty("Data save interval (seconds)")]
+            [JsonProperty("Deferred data save (true = periodic timer, false = save on every change)")]
+            public bool DeferredSave { get; set; } = false;
+
+            [JsonProperty("Data save interval (seconds) — used only when Deferred data save is true")]
             public float DataSaveIntervalSeconds { get; set; } = 300f;
 
             [JsonProperty("Stale record prune age (days, 0 = disabled)")]
@@ -258,8 +261,15 @@ namespace Oxide.Plugins
             });
             Puts($"Periodic check scheduled every {_config.CheckIntervalSeconds}s.");
 
-            _dataSaveTimer = timer.Every(_config.DataSaveIntervalSeconds, FlushDataIfDirty);
-            Puts($"Data save interval: {_config.DataSaveIntervalSeconds}s.");
+            if (_config.DeferredSave)
+            {
+                _dataSaveTimer = timer.Every(_config.DataSaveIntervalSeconds, FlushDataIfDirty);
+                Puts($"Data save: deferred (interval {_config.DataSaveIntervalSeconds}s).");
+            }
+            else
+            {
+                Puts("Data save: immediate (deferred save disabled).");
+            }
         }
 
         private void Unload()
@@ -514,7 +524,13 @@ namespace Oxide.Plugins
             }
         }
 
-        private void MarkDirty() => _dataDirty = true;
+        private void MarkDirty()
+        {
+            if (_config.DeferredSave)
+                _dataDirty = true;
+            else
+                SaveData();
+        }
 
         private void FlushDataIfDirty()
         {
