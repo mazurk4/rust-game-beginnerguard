@@ -5,7 +5,7 @@ using Oxide.Core;
 
 namespace Oxide.Plugins
 {
-    [Info("Beginner Guard", "Mazurk4_", "1.5.0")]
+    [Info("Beginner Guard", "Mazurk4_", "1.5.1")]
     [Description("Beginner server protection - restricts players by Rust Steam playtime")]
     public class BeginnerGuard : RustPlugin
     {
