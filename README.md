@@ -3,7 +3,7 @@
 An [Oxide/uMod](https://umod.org/) plugin for [Rust](https://store.steampowered.com/app/252490/Rust/) that keeps beginner servers beginner-friendly.  
 It checks each player's Steam Rust playtime on connect and removes anyone who has outgrown your server's skill level.
 
-**Version:** 1.5.0 | **Author:** Mazurk4_ | **License:** [MIT](LICENSE)
+**Version:** 1.5.1 | **Author:** Mazurk4_ | **License:** [MIT](LICENSE)
 
 [日本語版 README はこちら](README-JPN.md)
 
