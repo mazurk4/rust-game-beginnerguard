@@ -16,4 +16,7 @@ obj/
 Thumbs.db
 
 # Claude
+claude*
+.claude
+.claude/
 .claude/release-flow.md
