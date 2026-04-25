@@ -3,7 +3,7 @@
 An [Oxide/uMod](https://umod.org/) plugin for [Rust](https://store.steampowered.com/app/252490/Rust/) that keeps beginner servers beginner-friendly.  
 It checks each player's Steam Rust playtime on connect and removes anyone who has outgrown your server's skill level.
 
-**Version:** 1.4.0 | **Author:** Mazurk4_ | **License:** [MIT](LICENSE)
+**Version:** 1.5.0 | **Author:** Mazurk4_ | **License:** [MIT](LICENSE)
 
 [日本語版 README はこちら](README-JPN.md)
 
@@ -62,6 +62,8 @@ Players are also **periodically re-checked** while they are online.
 - **Periodic re-check** — re-validates all online players on a schedule
 - **Colored chat warnings** — orange `#FFA500` for easy visibility
 - **Multi-language** — English and Japanese built-in; add more via `oxide/lang/`
+- **Configurable save mode** — immediate save (default) or deferred periodic save to reduce disk IO on high-population servers
+- **Stale record pruning** — automatically removes records of players who haven't connected in a configurable number of days (default: 90), keeping the data file lean
 
 ---
 
@@ -83,6 +85,9 @@ See [`config/BeginnerGuard.json.example`](config/BeginnerGuard.json.example) for
 | `BAN duration (seconds)` | `86400` | How long the BAN lasts (default: 24 h) |
 | `Skip checks for Oxide admins` | `true` | Automatically exempt server admins |
 | `Enable debug logging` | `false` | Print verbose logs to the server console |
+| `Deferred data save` | `false` | `false` = save on every change (default); `true` = batch writes on a timer (reduces disk IO on busy servers) |
+| `Data save interval (seconds)` | `300` | How often deferred saves are flushed to disk — only used when `Deferred data save` is `true` |
+| `Stale record prune age (days, 0 = disabled)` | `90` | Player records older than this are removed automatically on startup; `0` disables pruning |
 
 ---
 
@@ -113,6 +118,7 @@ Requires `beginnerguard.admin` when used from the **in-game F1 console**.
 | `bg.unban <SteamID64>` | Lift an active BAN |
 | `bg.forcecheck <SteamID64>` | Trigger an immediate Steam API check (player must be online) |
 | `bg.reset <SteamID64>` | Wipe all stored data for a player |
+| `bg.prune` | Immediately remove stale records older than the configured prune age |
 | `bg.debug <on\|off>` | Toggle debug logging without restarting |
 
 ---
@@ -161,7 +167,13 @@ See [`lang/en/BeginnerGuard.json`](lang/en/BeginnerGuard.json) for the full mess
 ## Data Storage
 
 Records are saved to `oxide/data/BeginnerGuard.json` and persist across server restarts.  
-Each record stores: Steam hours · profile visibility · cumulative server playtime · kick count · BAN expiry.
+Each record stores: Steam hours · profile visibility · cumulative server playtime · kick count · BAN expiry · last seen timestamp.
+
+**Save modes** (configurable):
+- **Immediate** (default) — data is written to disk on every change. Safe for small servers.
+- **Deferred** — changes are batched and flushed on a periodic timer (`Data save interval`). Reduces disk IO on busy servers. BAN issuance and expiry are always written immediately regardless of this setting.
+
+**Stale record pruning** — on server startup, records of players who have not connected for more than `Stale record prune age` days are deleted automatically. Players who are currently online or still banned are never pruned. Records created before v1.5.0 (no last-seen timestamp) are skipped on the first pass as a migration safety measure.
 
 ---
 
