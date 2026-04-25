@@ -3,7 +3,7 @@
 [Oxide/uMod](https://umod.org/) 向け [Rust](https://store.steampowered.com/app/252490/Rust/) プラグインです。  
 接続してきたプレイヤーの Steam Rust プレイ時間を自動確認し、初心者サーバーを守ります。
 
-**バージョン:** 1.5.0 | **作者:** Mazurk4_ | **ライセンス:** [MIT](LICENSE)
+**バージョン:** 1.5.1 | **作者:** Mazurk4_ | **ライセンス:** [MIT](LICENSE)
 
 ---
 
