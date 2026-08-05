@@ -3,15 +3,15 @@
 [Oxide/uMod](https://umod.org/) 向け [Rust](https://store.steampowered.com/app/252490/Rust/) プラグインです。  
 接続してきたプレイヤーの Steam Rust プレイ時間を自動確認し、初心者サーバーを守ります。
 
-**バージョン:** 1.5.1 | **作者:** Mazurk4_ | **ライセンス:** [MIT](LICENSE)
+**バージョン:** 1.5.2 | **作者:** Mazurk4_ | **ライセンス:** [MIT](LICENSE)
 
 ---
 
 ## スクリーンショット
 
-![チャット警告 — プロフィール非公開](docs/screenshots/chat-warning.png)
+![チャット警告 — Steamプレイ時間を取得不能](docs/screenshots/chat-warning.png)
 
-*プロフィールが非公開の場合に表示されるチャット警告（オレンジ色）*
+*Steamのゲーム詳細またはプレイ時間を確認できない場合に表示されるチャット警告（オレンジ色）*
 
 ---
 
@@ -21,11 +21,11 @@
 
 | 状況 | 結果 |
 |------|------|
-| 時間数 ≤ 上限、プロフィール公開 | そのまま入場 |
+| 時間数 ≤ 上限、プレイ時間を取得可能 | そのまま入場 |
 | 時間数 > 上限 | チャット警告 → 一定時間後にキック |
-| プロフィール非公開、グレース期間内 | チャット警告 + グレース満了時にキック |
-| プロフィール非公開、グレース超過（警告回数残あり） | 警告キック（カウント +1） |
-| プロフィール非公開、警告回数使い果たし | 一時BAN発行 |
+| ゲーム詳細・プレイ時間を取得不能、グレース期間内 | チャット警告 + グレース満了時にキック |
+| 取得不能、グレース超過（警告回数残あり） | 警告キック（カウント +1） |
+| 取得不能、警告回数使い果たし | 一時BAN発行 |
 | BAN中に再接続 | 残り時間を表示して即キック |
 
 チャット警告は**オレンジ色**で表示され、多言語に対応しています。  
@@ -54,7 +54,7 @@
 ## 機能
 
 - **プレイ時間ゲート** — 時間上限を超えたプレイヤーを警告後にキック
-- **プロフィール非公開対応** — グレース期間 → 警告キック → 一時BAN の段階的処理
+- **プレイ時間を取得できない場合の対応** — グレース期間 → 警告キック → 一時BAN の段階的処理
 - **BAN 自動解除** — 時間が来ると自動解除。手動作業不要
 - **免除パーミッション** — VIP・スタッフ・信頼済みプレイヤーをチェック対象外にできる
 - **定期再チェック** — 設定間隔でオンライン全プレイヤーを再検証
@@ -74,11 +74,11 @@
 |------|-----------|------|
 | `Steam API Key` | *(必須)* | Steam Web API キー |
 | `Max allowed Rust playtime on Steam (hours)` | `1000` | この時間数を超えるとキック対象 |
-| `Private profile: max cumulative server playtime before kick (minutes)` | `120` | 非公開プロフィールに許容するサーバー累積滞在時間 |
+| `Private profile: max cumulative server playtime before kick (minutes)` | `120` | プレイ時間を取得できないプレイヤーに許容するサーバー累積滞在時間 |
 | `Steam API periodic check interval (seconds)` | `1800` | オンラインプレイヤーの再チェック間隔（デフォルト: 30分） |
 | `Steam API retry interval on failure (seconds)` | `1800` | API エラー時の再試行間隔 |
 | `Over-limit player: delay before kick after warning (seconds)` | `300` | 警告からキックまでの待機時間（プレイ時間超過） |
-| `Private profile: delay before kick after warning (seconds)` | `300` | 警告からキックまでの待機時間（非公開プロフィール） |
+| `Private profile: delay before kick after warning (seconds)` | `300` | 警告からキックまでの待機時間（プレイ時間を取得不能） |
 | `Private profile: max warning kicks before BAN` | `2` | BAN に移行するまでの警告キック回数 |
 | `BAN duration (seconds)` | `86400` | BAN の長さ（デフォルト: 24時間） |
 | `Skip checks for Oxide admins` | `true` | Oxide 管理者を自動で免除する |
@@ -86,6 +86,8 @@
 | `Deferred data save` | `false` | `false` = 変更のたびに即時保存（デフォルト）、`true` = タイマーによる定期保存（大規模サーバー向け） |
 | `Data save interval (seconds)` | `300` | 定期保存の間隔（秒）— `Deferred data save` が `true` のときのみ有効 |
 | `Stale record prune age (days, 0 = disabled)` | `90` | この日数以上接続のないプレイヤーのレコードを起動時に自動削除。`0` で無効 |
+
+Steam APIから時間を取得するには、プレイヤー側でSteamの「ゲームの詳細」を公開し、総プレイ時間を非公開にする設定をオフにする必要があります。Steam API障害時は誤判定によるキックを避けるため入場を維持し、設定間隔で再試行します。
 
 ---
 
@@ -131,12 +133,14 @@ oxide.grant user   <SteamID64>  beginnerguard.exempt
     │
     └─ Steam API でプレイ時間を取得
            │
-           ├─ プロフィール非公開 / API エラー
+           ├─ ゲーム詳細・プレイ時間を取得不能
            │       ├─ グレース期間内?              → チャット警告 + 満了時にキック
            │       ├─ グレース超過、警告回数残あり?  → 警告キック（カウント +1）
            │       └─ グレース超過、警告回数ゼロ?   → BAN 発行
            │
-           └─ プロフィール公開
+           ├─ API エラー → 入場を維持して再試行
+           │
+           └─ プレイ時間を取得
                    ├─ 時間数 ≤ 上限? → 入場
                    └─ 時間数 > 上限? → チャット警告 + 遅延後キック
 ```
@@ -171,7 +175,32 @@ oxide.grant user   <SteamID64>  beginnerguard.exempt
 - **即時保存**（デフォルト）— 変更のたびにディスクへ書き込む。小規模サーバー向け。
 - **定期保存** — 変更をまとめてタイマー間隔で書き込む。大規模サーバーのディスク IO 削減に有効。BAN の発行・解除は保存モードに関係なく常に即時書き込み。
 
-**古いレコードの自動削除** — サーバー起動時に `Stale record prune age` 日数を超えた未接続プレイヤーのレコードを自動削除します。オンライン中またはBAN中のプレイヤーは対象外です。v1.5.0 より前に作成されたレコード（最終接続日時が未記録）は移行安全のため初回はスキップされます。
+**古いレコードの自動削除** — サーバー起動時に `Stale record prune age` 日数を超えた未接続プレイヤーのレコードを自動削除します。オンライン中またはBAN中のプレイヤーは対象外です。最終接続日時がない旧レコードには移行時刻を設定し、そこから保持期間が経過した後に削除対象とします。
+
+一時BANはRust本体のBANリストではなく、このプラグインが期限を保存して再接続時にキックする仕組みです。プラグインを無効化している間は適用されません。
+
+---
+
+## 開発時の仮コンパイル
+
+.NET 8 SDKがあれば、Rustサーバーを起動せずにC#の構文と、プラグインが利用するAPI呼び出しの形を確認できます。
+
+```bash
+dotnet restore tests/compile/BeginnerGuard.CompileCheck.csproj \
+  --configfile tests/compile/NuGet.Config
+dotnet build tests/compile/BeginnerGuard.CompileCheck.csproj --no-restore
+```
+
+`tests/compile/UmodStubs.cs` はRust・uMod・Newtonsoft.Json APIの最小限の仮定義です。外部パッケージやSteam APIキーを使わず、ネットワークアクセスも必要ありません。この確認は実際のuMod環境との完全な互換性やゲーム内動作を保証しないため、リリース前にはローカルRustサーバーでも確認してください。
+
+### クレデンシャルの取り扱い
+
+このリポジトリは公開されています。Steam APIキー、RCONパスワード、サーバートークン、Webhook URLなどのクレデンシャルは絶対にコミットしないでください。
+
+- [`config/BeginnerGuard.json.example`](config/BeginnerGuard.json.example) のプレースホルダーを実キーへ置き換えない
+- 実キーはRustサーバー上の `oxide/config/BeginnerGuard.json` にだけ設定する
+- コミット前に `git diff --cached` でステージ済み差分を確認する
+- 誤って追加した場合は、公開前でもキーを失効・再発行する
 
 ---
 
