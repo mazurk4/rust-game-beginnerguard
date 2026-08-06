@@ -57,6 +57,9 @@ namespace Oxide.Plugins
             [JsonProperty("BAN duration (seconds)")]
             public float BanDurationSeconds { get; set; } = 86400f;
 
+            [JsonProperty("Private profile BAN grace")]
+            public BanGraceConfig BanGrace { get; set; } = new BanGraceConfig();
+
             [JsonProperty("Skip checks for Oxide admins")]
             public bool SkipAdmins { get; set; } = true;
 
@@ -74,6 +77,15 @@ namespace Oxide.Plugins
 
             [JsonProperty("Discord webhook notifications")]
             public DiscordWebhookConfig DiscordWebhook { get; set; } = new DiscordWebhookConfig();
+        }
+
+        private class BanGraceConfig
+        {
+            [JsonProperty("Enabled (recheck visibility after BAN expires)")]
+            public bool Enabled { get; set; } = false;
+
+            [JsonProperty("Escalated BAN duration (seconds)")]
+            public float EscalatedBanDurationSeconds { get; set; } = 86400f;
         }
 
         private class DiscordWebhookConfig
@@ -152,6 +164,8 @@ namespace Oxide.Plugins
         {
             if (_config.DiscordWebhook == null)
                 _config.DiscordWebhook = new DiscordWebhookConfig();
+            if (_config.BanGrace == null)
+                _config.BanGrace = new BanGraceConfig();
 
             _config.MaxSteamHours = ValidateNonNegative(_config.MaxSteamHours,
                 "Max allowed Rust playtime on Steam (hours)", 1000);
@@ -169,6 +183,10 @@ namespace Oxide.Plugins
                 "Private profile: max warning kicks before BAN", 2);
             _config.BanDurationSeconds = ValidatePositive(_config.BanDurationSeconds,
                 "BAN duration (seconds)", 86400f, 315360000f); // 10 years
+            _config.BanGrace.EscalatedBanDurationSeconds = ValidatePositive(
+                _config.BanGrace.EscalatedBanDurationSeconds,
+                "Private profile BAN grace: Escalated BAN duration (seconds)",
+                86400f, 315360000f); // 10 years
             _config.DataSaveIntervalSeconds = ValidatePositive(_config.DataSaveIntervalSeconds,
                 "Data save interval (seconds)", 300f);
             _config.StaleRecordPruneAgeDays = ValidateNonNegative(_config.StaleRecordPruneAgeDays,
@@ -210,12 +228,13 @@ namespace Oxide.Plugins
             // English (default)
             lang.RegisterMessages(new Dictionary<string, string>
             {
-                ["PrivateProfile.GraceWarn"]       = "<color=#FFA500>[BeginnerGuard] Your Steam game details or playtime are not public.\nYou will be kicked in approximately {0} minute(s) if they remain hidden.\nHow to fix: Steam → Profile → Edit Profile → Privacy Settings → set Game details to Public and make total playtime visible.</color>",
-                ["PrivateProfile.GraceKickReason"] = "[BeginnerGuard] Kicked: cumulative server playtime limit reached.\nPlease make your Steam game details and total playtime public, then reconnect.",
-                ["PrivateProfile.WarnKick"]        = "<color=#FFA500>[BeginnerGuard] Your Steam game details or playtime are hidden!\nPlease make them public within {0}s.\nWarning {1}/{2} — a {3}h BAN will be issued if you exceed this.\nHow to fix: Steam → Profile → Edit Profile → Privacy Settings → Game details: Public; total playtime: visible.</color>",
-                ["PrivateProfile.WarnKickReason"]  = "[BeginnerGuard] Kicked: Steam game details or playtime are hidden.\nPlease make them public and reconnect.",
-                ["PrivateProfile.BanKickReason"]   = "[BeginnerGuard] You have been banned for {0} hour(s).\nReason: Steam game details or playtime remained hidden after repeated warnings.\nPlease make both public before reconnecting.",
-                ["PrivateProfile.BanConnectKick"]  = "[BeginnerGuard] You are banned. Ban expires in: {0}h {1}m\nPlease make your Steam game details and total playtime public before reconnecting.",
+                ["PrivateProfile.GraceWarn"]       = "<color=#FFA500>[BeginnerGuard] Your Steam game details or total playtime are not public.\nYou will be kicked in approximately {0} minute(s) if they remain hidden.\nHow to fix: Steam → Profile → Edit Profile → Privacy Settings → set Game details to Public and uncheck 'Always keep my total playtime private even if users can see my game details'.</color>",
+                ["PrivateProfile.GraceKickReason"] = "[BeginnerGuard] Kicked: cumulative server playtime limit reached.\nSet Steam Game details to Public and uncheck 'Always keep my total playtime private even if users can see my game details', then reconnect.",
+                ["PrivateProfile.WarnKick"]        = "<color=#FFA500>[BeginnerGuard] Your Steam game details or total playtime are hidden!\nPlease make them public within {0}s.\nWarning {1}/{2} — a {3}h BAN will be issued if you exceed this.\nHow to fix: Steam → Profile → Edit Profile → Privacy Settings → Game details: Public; uncheck 'Always keep my total playtime private even if users can see my game details'.</color>",
+                ["PrivateProfile.WarnKickReason"]  = "[BeginnerGuard] Kicked: Steam game details or total playtime are hidden.\nSet Game details to Public, uncheck the total-playtime privacy option, and reconnect.",
+                ["PrivateProfile.BanKickReason"]   = "[BeginnerGuard] You have been banned for {0} hour(s).\nReason: Steam game details or total playtime remained hidden after repeated warnings.\nSet Game details to Public and uncheck the total-playtime privacy option before reconnecting.",
+                ["PrivateProfile.EscalatedBanKickReason"] = "[BeginnerGuard] Your BAN has been extended to {0} hour(s).\nYour Steam playtime was still unavailable after the previous BAN expired.\nSteam → Profile → Edit Profile → Privacy Settings → Game details: Public; uncheck 'Always keep my total playtime private even if users can see my game details'.",
+                ["PrivateProfile.BanConnectKick"]  = "[BeginnerGuard] You are banned. Ban expires in: {0}h {1}m\nBefore reconnecting, set Steam Game details to Public and uncheck 'Always keep my total playtime private even if users can see my game details'.",
                 ["OverLimit.Warn"]                 = "<color=#FFA500>[BeginnerGuard] This is a beginner-only server.\nYour Rust playtime on Steam: {0}h (limit: {1}h).\nYou will be kicked in {2}s. Please find a server that matches your experience level.</color>",
                 ["OverLimit.KickReason"]           = "[BeginnerGuard] Kicked: playtime too high ({0}h / limit {1}h).\nThis server is for beginners only. Thanks for understanding!",
             }, this);
@@ -223,12 +242,13 @@ namespace Oxide.Plugins
             // Japanese
             lang.RegisterMessages(new Dictionary<string, string>
             {
-                ["PrivateProfile.GraceWarn"]       = "<color=#FFA500>[BeginnerGuard] Steamのゲーム詳細またはプレイ時間が公開されていません。\nこのまま確認できない場合、約{0}分後にキックされます。\n修正方法: Steam → プロフィール → プロフィールを編集 → プライバシー設定 → ゲームの詳細を公開し、総プレイ時間も表示</color>",
-                ["PrivateProfile.GraceKickReason"] = "[BeginnerGuard] キック: サーバー滞在時間の上限に達しました。\nSteamのゲーム詳細と総プレイ時間を公開して再接続してください。",
-                ["PrivateProfile.WarnKick"]        = "<color=#FFA500>[BeginnerGuard] Steamのゲーム詳細またはプレイ時間を確認できません！\n{0}秒以内に公開してください。\n警告 {1}/{2} — 超過した場合は{3}時間のBANが適用されます。\n修正方法: Steam → プロフィール → プロフィールを編集 → プライバシー設定 → ゲームの詳細: 公開、総プレイ時間: 表示</color>",
-                ["PrivateProfile.WarnKickReason"]  = "[BeginnerGuard] キック: Steamのゲーム詳細またはプレイ時間を確認できません。\n両方を公開して再接続してください。",
-                ["PrivateProfile.BanKickReason"]   = "[BeginnerGuard] {0}時間のBANが適用されました。\n理由: 警告後もSteamのゲーム詳細またはプレイ時間を確認できませんでした。\n再接続前に両方を公開してください。",
-                ["PrivateProfile.BanConnectKick"]  = "[BeginnerGuard] BANされています。解除まで: {0}時間{1}分\n再接続前にSteamのゲーム詳細と総プレイ時間を公開してください。",
+                ["PrivateProfile.GraceWarn"]       = "<color=#FFA500>[BeginnerGuard] Steamのゲーム詳細または総プレイ時間が公開されていません。\nこのまま確認できない場合、約{0}分後にキックされます。\n修正方法: Steam → プロフィール → プロフィールを編集 → プライバシー設定 →「ゲームの詳細」を公開し、「ゲームの詳細が公開中でも総プレイ時間を常に非公開にする」のチェックを外してください。</color>",
+                ["PrivateProfile.GraceKickReason"] = "[BeginnerGuard] キック: サーバー滞在時間の上限に達しました。\nSteamの「ゲームの詳細」を公開し、総プレイ時間を常に非公開にする設定をオフにしてから再接続してください。",
+                ["PrivateProfile.WarnKick"]        = "<color=#FFA500>[BeginnerGuard] Steamのゲーム詳細または総プレイ時間を確認できません！\n{0}秒以内に公開してください。\n警告 {1}/{2} — 超過した場合は{3}時間のBANが適用されます。\n修正方法: Steam → プロフィール → プロフィールを編集 → プライバシー設定 →「ゲームの詳細」を公開し、「ゲームの詳細が公開中でも総プレイ時間を常に非公開にする」のチェックを外してください。</color>",
+                ["PrivateProfile.WarnKickReason"]  = "[BeginnerGuard] キック: Steamのゲーム詳細または総プレイ時間を確認できません。\n「ゲームの詳細」を公開し、総プレイ時間を常に非公開にする設定をオフにしてから再接続してください。",
+                ["PrivateProfile.BanKickReason"]   = "[BeginnerGuard] {0}時間のBANが適用されました。\n理由: 警告後もSteamのゲーム詳細または総プレイ時間を確認できませんでした。\n「ゲームの詳細」を公開し、総プレイ時間を常に非公開にする設定をオフにしてください。",
+                ["PrivateProfile.EscalatedBanKickReason"] = "[BeginnerGuard] BANが{0}時間に延長されました。\n前回のBAN終了後もSteamの総プレイ時間を確認できませんでした。\nSteam → プロフィール → プロフィールを編集 → プライバシー設定 →「ゲームの詳細」を公開し、「ゲームの詳細が公開中でも総プレイ時間を常に非公開にする」のチェックを外してください。",
+                ["PrivateProfile.BanConnectKick"]  = "[BeginnerGuard] BANされています。解除まで: {0}時間{1}分\n再接続前にSteamの「ゲームの詳細」を公開し、「ゲームの詳細が公開中でも総プレイ時間を常に非公開にする」のチェックを外してください。",
                 ["OverLimit.Warn"]                 = "<color=#FFA500>[BeginnerGuard] このサーバーは初心者専用です。\nあなたのRust Steamプレイ時間: {0}時間（上限: {1}時間）\n{2}秒後にキックされます。ご自身の経験に合ったサーバーをお探しください。</color>",
                 ["OverLimit.KickReason"]           = "[BeginnerGuard] キック: プレイ時間が超過しています（{0}時間 / 上限 {1}時間）\nこのサーバーは初心者専用です。ご理解ありがとうございます！",
             }, this, "ja");
@@ -254,6 +274,8 @@ namespace Oxide.Plugins
             // LastJoinTime stored as UTC ticks (long) to avoid DateTime? JSON issues
             public long   LastJoinTicks         { get; set; } = 0;      // 0 = not connected
             public int    PrivateKickCount      { get; set; } = 0;
+            // 0 = no active BAN cycle, 1 = initial BAN issued, 2 = escalated BAN cycle
+            public int    PrivateBanStage       { get; set; } = 0;
             // BannedUntil stored as UTC ticks; 0 = not banned
             public long   BannedUntilTicks      { get; set; } = 0;
             // LastSteamCheck stored as UTC ticks; 0 = never checked
@@ -445,6 +467,14 @@ namespace Oxide.Plugins
             // BAN check
             if (record.BannedUntil.HasValue)
             {
+                // Enrol active or expired BANs created before this feature was
+                // enabled into the initial stage on their next connection.
+                if (_config.BanGrace.Enabled && record.PrivateBanStage == 0)
+                {
+                    record.PrivateBanStage = 1;
+                    SaveData();
+                }
+
                 if (DateTime.UtcNow < record.BannedUntil.Value)
                 {
                     var rem = record.BannedUntil.Value - DateTime.UtcNow;
@@ -459,14 +489,24 @@ namespace Oxide.Plugins
                         GetMsg("PrivateProfile.BanConnectKick", player, remainingHours, remainingMinutes));
                     return;
                 }
-                // Expired — auto-lift
-                DebugLog($"BAN expired for {player.displayName} — lifting automatically.");
-                record.BannedUntil      = null;
-                record.PrivateKickCount = 0;
+                // Expired — either reset normally or retain the BAN stage so
+                // the Steam response can decide whether escalation is needed.
+                bool recheckForEscalation = _config.BanGrace.Enabled &&
+                                            record.PrivateBanStage > 0;
+                DebugLog($"BAN expired for {player.displayName} — " +
+                         (recheckForEscalation ? "rechecking visibility." : "lifting automatically."));
+                record.BannedUntil = null;
+                if (!recheckForEscalation)
+                {
+                    record.PrivateKickCount = 0;
+                    record.PrivateBanStage  = 0;
+                }
                 SaveData();  // flush BAN lift immediately
                 NotifyDiscord(_config.DiscordWebhook.NotifyBanExpired,
                     "BAN expired automatically", player,
-                    "The player will now be checked normally.");
+                    recheckForEscalation
+                        ? "Steam playtime visibility will be rechecked before the BAN cycle is reset."
+                        : "The player will now be checked normally.");
             }
 
             record.LastJoinTime = DateTime.UtcNow;
@@ -657,7 +697,9 @@ namespace Oxide.Plugins
                     record.SteamTotalHours  = hours;
                     record.IsProfilePrivate = false;
                     record.LastSteamCheck   = DateTime.UtcNow;
-                    if (!overLimit) record.PrivateKickCount = 0;
+                    // Publishing playtime completes any private-profile BAN cycle.
+                    record.PrivateKickCount = 0;
+                    record.PrivateBanStage  = 0;
                     MarkDirty();
 
                     Puts($"[BeginnerGuard] {player.displayName} — Steam Rust hours: {hours}h " +
@@ -714,6 +756,13 @@ namespace Oxide.Plugins
             record.LastSteamCheck   = DateTime.UtcNow;
             MarkDirty();
 
+            if (_config.BanGrace.Enabled && record.PrivateBanStage > 0)
+            {
+                IssuePrivateProfileBan(player, record,
+                    _config.BanGrace.EscalatedBanDurationSeconds, true);
+                return;
+            }
+
             double currentSession = record.LastJoinTime.HasValue
                 ? (DateTime.UtcNow - record.LastJoinTime.Value).TotalMinutes : 0.0;
             double totalMinutes   = record.ServerPlaytimeMinutes + currentSession;
@@ -749,19 +798,7 @@ namespace Oxide.Plugins
 
             if (record.PrivateKickCount >= _config.KickCountBeforeBan)
             {
-                // Issue BAN
-                record.BannedUntil      = DateTime.UtcNow.AddSeconds(_config.BanDurationSeconds);
-                record.PrivateKickCount = 0;
-                SaveData();  // flush BAN immediately
-
-                double banHours = _config.BanDurationSeconds / 3600.0;
-                Puts($"[BeginnerGuard] BAN issued to {player.displayName} ({player.UserIDString}) " +
-                     $"for {banHours:F0}h — Steam playtime unavailable.");
-                NotifyDiscord(_config.DiscordWebhook.NotifyBanIssued,
-                    "Temporary BAN issued", player,
-                    $"Duration: {banHours:F0}h\nReason: Steam playtime unavailable after warnings");
-                KickPlayer(player,
-                    GetMsg("PrivateProfile.BanKickReason", player, banHours.ToString("F0")));
+                IssuePrivateProfileBan(player, record, _config.BanDurationSeconds, false);
             }
             else
             {
@@ -782,6 +819,30 @@ namespace Oxide.Plugins
                         "Private-profile warning kick", player,
                         $"Warning: {warningNumber}/{_config.KickCountBeforeBan}\nAction: kicked"));
             }
+        }
+
+        private void IssuePrivateProfileBan(BasePlayer player, PlayerRecord record,
+            float durationSeconds, bool escalated)
+        {
+            record.BannedUntil      = DateTime.UtcNow.AddSeconds(durationSeconds);
+            record.PrivateKickCount = 0;
+            record.PrivateBanStage  = _config.BanGrace.Enabled ? (escalated ? 2 : 1) : 0;
+            SaveData();  // flush BAN immediately
+
+            double banHours = durationSeconds / 3600.0;
+            string stage = escalated ? "Escalated temporary BAN issued" : "Temporary BAN issued";
+            string reason = escalated
+                ? "Steam playtime remained unavailable after the previous BAN expired"
+                : "Steam playtime unavailable after warnings";
+
+            Puts($"[BeginnerGuard] {(escalated ? "Escalated BAN" : "BAN")} issued to " +
+                 $"{player.displayName} ({player.UserIDString}) for {banHours:F0}h — {reason}.");
+            NotifyDiscord(_config.DiscordWebhook.NotifyBanIssued,
+                stage, player, $"Duration: {banHours:F0}h\nReason: {reason}");
+            KickPlayer(player, GetMsg(escalated
+                    ? "PrivateProfile.EscalatedBanKickReason"
+                    : "PrivateProfile.BanKickReason",
+                player, banHours.ToString("F0")));
         }
 
         private void HandleOverLimitPlayer(BasePlayer player, PlayerRecord record, int hours)
@@ -1057,6 +1118,7 @@ namespace Oxide.Plugins
                     $"Playtime unavailable: {r.IsProfilePrivate}\n" +
                     $"Server playtime     : {r.ServerPlaytimeMinutes:F1} min\n" +
                     $"Kick count          : {r.PrivateKickCount} / {_config.KickCountBeforeBan}\n" +
+                    $"Private BAN stage   : {r.PrivateBanStage}\n" +
                     $"Banned until (UTC)  : {banStr}\n" +
                     $"Last Steam check    : {checkStr}");
             }
@@ -1078,6 +1140,7 @@ namespace Oxide.Plugins
                 bool hadActiveBan = r.BannedUntil.HasValue && r.BannedUntil.Value > DateTime.UtcNow;
                 r.BannedUntil      = null;
                 r.PrivateKickCount = 0;
+                r.PrivateBanStage  = 0;
                 SaveData();
                 arg.ReplyWith($"[BeginnerGuard] BAN lifted for {r.DisplayName} ({sid}).");
                 Puts($"[BeginnerGuard] BAN manually lifted for {r.DisplayName} ({sid}).");
@@ -1085,7 +1148,7 @@ namespace Oxide.Plugins
                 NotifyDiscord(_config.DiscordWebhook.NotifyManualUnban,
                     "BAN manually lifted", r.DisplayName, sid,
                     $"Active BAN before command: {(hadActiveBan ? "yes" : "no")}\n" +
-                    "Warning kick count reset to 0.");
+                    "BAN stage and warning kick count reset to 0.");
             }
             else
             {

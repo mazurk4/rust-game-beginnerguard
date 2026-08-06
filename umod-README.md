@@ -29,6 +29,7 @@ Everything is configurable — playtime cap, grace period, kick delays, BAN dura
 - Orange colored chat warnings (`#FFA500`) for easy visibility
 - Multi-language — English and Japanese built-in; add more via `oxide/lang/`
 - Discord Webhook notifications with independent switches for grace, kick, BAN, reconnect, expiry, and manual unban events
+- Optional post-BAN visibility recheck with escalation to a longer repeating BAN
 
 ---
 
@@ -60,6 +61,7 @@ Players must make Steam **Game details** public and make total playtime visible.
 - **Private profile kick delay (seconds)** — default `300` — Delay between chat warning and kick
 - **Warning kicks before BAN** — default `2` — How many warning kicks before a BAN is issued
 - **BAN duration (seconds)** — default `86400` — BAN length (default: 24 hours)
+- **Private profile BAN grace** — disabled by default — Recheck visibility after the initial BAN; if still unavailable, apply the configured escalated BAN duration
 - **Skip checks for Oxide admins** — default `true` — Auto-exempt server admins
 - **Enable debug logging** — default `false` — Verbose output to server console
 - **Discord webhook notifications** — default all `false` — Set a Webhook URL and enable only the enforcement stages you want reported
@@ -93,7 +95,7 @@ Requires `beginnerguard.admin` when used from the **in-game F1 console**.
 
 Temporary BANs are enforced by this plugin on reconnect; they are not added to Rust's native ban list.
 
-`bg.unban` clears the BAN expiry and warning-kick count, but keeps cumulative server playtime. The player is checked normally on their next connection; use `bg.forcecheck` for an online player or `bg.reset` to clear all stored state.
+`bg.unban` clears the BAN expiry, BAN stage, and warning-kick count, but keeps cumulative server playtime. The player is checked normally on their next connection; use `bg.forcecheck` for an online player or `bg.reset` to clear all stored state.
 
 ---
 

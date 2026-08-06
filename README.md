@@ -84,6 +84,7 @@ See [`config/BeginnerGuard.json.example`](config/BeginnerGuard.json.example) for
 | `Private profile: delay before kick after warning (seconds)` | `300` | Seconds between chat warning and kick |
 | `Private profile: max warning kicks before BAN` | `2` | Warning kick count before a BAN is issued |
 | `BAN duration (seconds)` | `86400` | How long the BAN lasts (default: 24 h) |
+| `Private profile BAN grace` | See below | Optionally recheck visibility after a BAN and escalate if playtime is still unavailable |
 | `Skip checks for Oxide admins` | `true` | Automatically exempt server admins |
 | `Enable debug logging` | `false` | Print verbose logs to the server console |
 | `Deferred data save` | `false` | `false` = save on every change (default); `true` = batch writes on a timer (reduces disk IO on busy servers) |
@@ -100,13 +101,32 @@ Set `Webhook URL` under `Discord webhook notifications`, then enable only the ev
 | `Notify when private-profile grace period starts` | A player enters grace and a grace-expiry kick is scheduled |
 | `Notify when private-profile grace period expires and player is kicked` | The grace period expires and the player is actually kicked |
 | `Notify when private-profile warning kick occurs` | A post-grace warning kick is actually performed |
-| `Notify when temporary BAN is issued` | Warning kicks are exhausted and a temporary BAN is issued |
+| `Notify when temporary BAN is issued` | An initial or escalated temporary BAN is issued |
 | `Notify when a banned reconnect is blocked` | A reconnect attempt is blocked during an active BAN |
-| `Notify when a BAN expires automatically` | An expired BAN is automatically lifted on connection |
+| `Notify when a BAN expires automatically` | BAN expiry is detected on connection; post-BAN grace then rechecks visibility when enabled |
 | `Notify when bg.unban is used` | An administrator runs `bg.unban` |
 | `Notify when an over-limit player is kicked` | A player is kicked for exceeding the Steam playtime limit |
 
 Treat the Webhook URL as a secret and never place it in a public repository or log. Discord mentions are disabled in notification payloads.
+
+### Post-BAN grace and escalation
+
+`Private profile BAN grace` is disabled by default. When enabled, the plugin rechecks Steam visibility after the initial BAN expires.
+
+```json
+"BAN duration (seconds)": 3600.0,
+"Private profile BAN grace": {
+  "Enabled (recheck visibility after BAN expires)": true,
+  "Escalated BAN duration (seconds)": 86400.0
+}
+```
+
+- Visible playtime resets the BAN stage and warning count.
+- Unavailable playtime immediately triggers the escalated BAN (24 hours in the example).
+- If playtime remains unavailable after that BAN, the escalated duration repeats.
+- BANs created before the option was enabled enter the initial stage on the player's next connection.
+- Visible but over-limit playtime still follows the normal over-limit kick flow.
+- `bg.unban` and `bg.reset` clear the BAN stage.
 
 For Steam playtime to be available, the player must make Steam **Game details** public and disable the option that keeps total playtime private. A zero playtime value is treated as unavailable because Steam can return `0` when total playtime is hidden; genuinely new players remain protected by the normal grace period. Steam API failures are handled fail-open to avoid false kicks; the plugin keeps the player connected and retries later.
 
@@ -144,7 +164,7 @@ Requires `beginnerguard.admin` when used from the **in-game F1 console**.
 
 ### Re-evaluation after `bg.unban`
 
-`bg.unban` immediately clears the BAN expiry and warning-kick count. It does not clear cumulative server playtime or the last Steam result, and the command itself does not start a Steam API check.
+`bg.unban` immediately clears the BAN expiry, BAN stage, and warning-kick count. It does not clear cumulative server playtime or the last Steam result, and the command itself does not start a Steam API check.
 
 - If the player is offline, the normal Steam API check runs on their next connection.
 - If playtime is visible and within the limit, the player is allowed.
@@ -168,6 +188,7 @@ Player connects
            │       ├─ Within grace period?        → Chat warning + kick scheduled at expiry
            │       ├─ Over grace, warnings left?   → Warning kick (counter +1)
            │       └─ Over grace, warnings used up? → BAN issued
+           │              └─ BAN grace enabled, still unavailable after expiry? → Escalated BAN
            │
            ├─ API error → keep connected and retry
            │
@@ -186,11 +207,15 @@ Language files are auto-generated in `oxide/lang/{code}/BeginnerGuard.json` on f
 |----------|------|--------|
 | English  | `en` | Default |
 | Japanese | `ja` | Built-in |
+| Korean | `ko` | Deployment sample included |
+| Simplified Chinese | `zh-CN` | Deployment sample included |
+| Russian | `ru` | Deployment sample included |
+| Vietnamese | `vi` | Deployment sample included |
 
 **To add a new language:**
 
-1. Copy `oxide/lang/en/BeginnerGuard.json` → `oxide/lang/<code>/BeginnerGuard.json`
-2. Translate the values — **do not change the keys**
+1. For an included sample, copy `lang/<code>/BeginnerGuard.json` to the server's `oxide/lang/<code>/BeginnerGuard.json`
+2. Otherwise copy `oxide/lang/en/BeginnerGuard.json` and translate the values — **do not change the keys**
 3. `oxide.reload BeginnerGuard`
 
 See [`lang/en/BeginnerGuard.json`](lang/en/BeginnerGuard.json) for the full message list and placeholder reference.
@@ -200,7 +225,7 @@ See [`lang/en/BeginnerGuard.json`](lang/en/BeginnerGuard.json) for the full mess
 ## Data Storage
 
 Records are saved to `oxide/data/BeginnerGuard.json` and persist across server restarts.  
-Each record stores: Steam hours · profile visibility · cumulative server playtime · kick count · BAN expiry · last seen timestamp.
+Each record stores: Steam hours · profile visibility · cumulative server playtime · kick count · BAN stage · BAN expiry · last seen timestamp.
 
 **Save modes** (configurable):
 - **Immediate** (default) — data is written to disk on every change. Safe for small servers.
