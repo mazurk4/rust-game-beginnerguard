@@ -1,0 +1,11 @@
+{
+  "PrivateProfile.GraceWarn": "<color=#FFA500>[BeginnerGuard] 您的 Steam 游戏详情或总游戏时间未公开。\n如果仍无法确认，您将在约 {0} 分钟后被踢出。\n解决方法：Steam → 个人资料 → 编辑个人资料 → 隐私设置 → 将“游戏详情”设为公开，并取消勾选“即使用户可以查看我的游戏详情，也始终将我的总游戏时间设为私密”。</color>",
+  "PrivateProfile.GraceKickReason": "[BeginnerGuard] 已踢出：累计服务器游戏时间已达到上限。\n请将 Steam 游戏详情设为公开并关闭总游戏时间私密选项，然后重新连接。",
+  "PrivateProfile.WarnKick": "<color=#FFA500>[BeginnerGuard] 无法查看您的 Steam 游戏详情或总游戏时间！\n请在 {0} 秒内将其公开。\n警告 {1}/{2} — 超过次数后将被封禁 {3} 小时。\n解决方法：Steam → 个人资料 → 编辑个人资料 → 隐私设置 → 游戏详情：公开；总游戏时间私密选项：取消勾选。</color>",
+  "PrivateProfile.WarnKickReason": "[BeginnerGuard] 已踢出：Steam 游戏详情或总游戏时间处于私密状态。\n请公开游戏详情并关闭总游戏时间私密选项，然后重新连接。",
+  "PrivateProfile.BanKickReason": "[BeginnerGuard] 您已被封禁 {0} 小时。\n原因：多次警告后仍无法查看您的 Steam 游戏详情或总游戏时间。\n重新连接前，请公开游戏详情并关闭总游戏时间私密选项。",
+  "PrivateProfile.EscalatedBanKickReason": "[BeginnerGuard] 您的封禁已延长至 {0} 小时。\n上一次封禁到期后，您的 Steam 总游戏时间仍无法查看。\nSteam → 个人资料 → 编辑个人资料 → 隐私设置 → 游戏详情：公开；总游戏时间私密选项：取消勾选。",
+  "PrivateProfile.BanConnectKick": "[BeginnerGuard] 您当前处于封禁状态。剩余时间：{0} 小时 {1} 分钟\n重新连接前，请公开 Steam 游戏详情并关闭总游戏时间私密选项。",
+  "OverLimit.Warn": "<color=#FFA500>[BeginnerGuard] 本服务器仅供新手玩家使用。\n您的 Steam Rust 游戏时间：{0} 小时（上限：{1} 小时）\n您将在 {2} 秒后被踢出。请选择适合您经验水平的服务器。</color>",
+  "OverLimit.KickReason": "[BeginnerGuard] 已踢出：游戏时间超过上限（{0} 小时 / 上限 {1} 小时）\n本服务器仅供新手玩家使用，感谢理解！"
+}

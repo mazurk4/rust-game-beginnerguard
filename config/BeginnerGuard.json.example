@@ -8,6 +8,10 @@
   "Private profile: delay before kick after warning (seconds)": 300.0,
   "Private profile: max warning kicks before BAN": 2,
   "BAN duration (seconds)": 86400.0,
+  "Private profile BAN grace": {
+    "Enabled (recheck visibility after BAN expires)": false,
+    "Escalated BAN duration (seconds)": 86400.0
+  },
   "Skip checks for Oxide admins": true,
   "Enable debug logging": false,
   "Deferred data save (true = periodic timer, false = save on every change)": false,

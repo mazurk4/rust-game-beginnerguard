@@ -82,6 +82,7 @@
 | `Private profile: delay before kick after warning (seconds)` | `300` | 警告からキックまでの待機時間（プレイ時間を取得不能） |
 | `Private profile: max warning kicks before BAN` | `2` | BAN に移行するまでの警告キック回数 |
 | `BAN duration (seconds)` | `86400` | BAN の長さ（デフォルト: 24時間） |
+| `Private profile BAN grace` | 下記参照 | BAN終了後に公開状態を再確認し、未公開なら長時間BANへ昇格するオプション |
 | `Skip checks for Oxide admins` | `true` | Oxide 管理者を自動で免除する |
 | `Enable debug logging` | `false` | サーバーコンソールに詳細ログを出力する |
 | `Deferred data save` | `false` | `false` = 変更のたびに即時保存（デフォルト）、`true` = タイマーによる定期保存（大規模サーバー向け） |
@@ -98,13 +99,32 @@
 | `Notify when private-profile grace period starts` | プレイ時間を取得できず、グレース満了キックを予約した時 |
 | `Notify when private-profile grace period expires and player is kicked` | グレースが満了し、実際にキックした時 |
 | `Notify when private-profile warning kick occurs` | グレース超過後の警告キックを実行した時 |
-| `Notify when temporary BAN is issued` | 警告回数を使い果たし、一時BANを発行した時 |
+| `Notify when temporary BAN is issued` | 初回または昇格の一時BANを発行した時 |
 | `Notify when a banned reconnect is blocked` | BAN中の再接続を拒否した時 |
-| `Notify when a BAN expires automatically` | 接続時に期限切れBANを自動解除した時 |
+| `Notify when a BAN expires automatically` | 接続時にBAN期限切れを検出した時（BANグレース有効時は続けて公開状態を再確認） |
 | `Notify when bg.unban is used` | 管理者が `bg.unban` を実行した時 |
 | `Notify when an over-limit player is kicked` | Steamプレイ時間上限超過によるキックを実行した時 |
 
 Webhook URL は秘密情報として扱い、公開リポジトリやログに貼らないでください。通知本文では Discord のメンションを無効化しています。
+
+### BANグレース（段階的BAN）
+
+`Private profile BAN grace` はデフォルトで無効です。有効にすると、初回BANの終了後にSteamの公開状態を再確認します。
+
+```json
+"BAN duration (seconds)": 3600.0,
+"Private profile BAN grace": {
+  "Enabled (recheck visibility after BAN expires)": true,
+  "Escalated BAN duration (seconds)": 86400.0
+}
+```
+
+- 初回BAN終了後、総プレイ時間を確認できればBAN段階と警告回数をリセットします。
+- まだ確認できなければ、即座に昇格BAN（上記例では24時間）を適用します。
+- 昇格BAN終了後も確認できない場合は、同じ昇格BANを繰り返します。
+- 機能を有効化する前から存在するBANも、次回接続時に初回BAN段階として引き継ぎます。
+- Steam時間が公開されていても上限を超えている場合は、通常の時間超過キックを適用します。
+- `bg.unban` と `bg.reset` はBAN段階もリセットします。
 
 Steam APIから時間を取得するには、プレイヤー側でSteamの「ゲームの詳細」を公開し、総プレイ時間を非公開にする設定をオフにする必要があります。Steamは総プレイ時間が非公開の場合に `0` を返すことがあるため、0時間は取得不能として扱います。本当に初回起動のプレイヤーには通常のグレース期間が適用されます。Steam API障害時は誤判定によるキックを避けるため入場を維持し、設定間隔で再試行します。
 
@@ -142,7 +162,7 @@ oxide.grant user   <SteamID64>  beginnerguard.exempt
 
 ### `bg.unban` 後の再判定
 
-`bg.unban` は BAN 期限と警告キック回数を即時にリセットしますが、累積サーバー滞在時間や直近の Steam 判定結果は消去しません。また、コマンド実行だけでは Steam API の再判定を開始しません。
+`bg.unban` は BAN 期限、BAN段階、警告キック回数を即時にリセットしますが、累積サーバー滞在時間や直近の Steam 判定結果は消去しません。また、コマンド実行だけでは Steam API の再判定を開始しません。
 
 - 対象がオフラインなら、次回接続時に通常どおり Steam API で再判定します。
 - プレイ時間が取得でき、上限以内なら入場できます。
@@ -166,6 +186,7 @@ oxide.grant user   <SteamID64>  beginnerguard.exempt
            │       ├─ グレース期間内?              → チャット警告 + 満了時にキック
            │       ├─ グレース超過、警告回数残あり?  → 警告キック（カウント +1）
            │       └─ グレース超過、警告回数ゼロ?   → BAN 発行
+           │              └─ BANグレース有効、期限後も取得不能? → 昇格BAN
            │
            ├─ API エラー → 入場を維持して再試行
            │
@@ -184,11 +205,15 @@ oxide.grant user   <SteamID64>  beginnerguard.exempt
 |------|--------|------|
 | English | `en` | デフォルト |
 | 日本語 | `ja` | 標準搭載 |
+| 한국어 | `ko` | 配置用サンプルあり |
+| 简体中文 | `zh-CN` | 配置用サンプルあり |
+| Русский | `ru` | 配置用サンプルあり |
+| Tiếng Việt | `vi` | 配置用サンプルあり |
 
 **新しい言語を追加するには:**
 
-1. `oxide/lang/en/BeginnerGuard.json` を `oxide/lang/<コード>/BeginnerGuard.json` にコピー
-2. 値（メッセージ本文）を翻訳する — **キーは変更しないこと**
+1. サンプルがある言語は `lang/<コード>/BeginnerGuard.json` をサーバーの `oxide/lang/<コード>/BeginnerGuard.json` にコピー
+2. それ以外は `oxide/lang/en/BeginnerGuard.json` をコピーして値を翻訳する — **キーは変更しないこと**
 3. `oxide.reload BeginnerGuard`
 
 メッセージ一覧とプレースホルダーの詳細は [`lang/en/BeginnerGuard.json`](lang/en/BeginnerGuard.json) を参照してください。
@@ -198,7 +223,7 @@ oxide.grant user   <SteamID64>  beginnerguard.exempt
 ## データ保存
 
 プレイヤーのデータは `oxide/data/BeginnerGuard.json` に保存され、サーバー再起動後も引き継がれます。  
-記録内容: Steam時間数 · プロフィール公開状態 · サーバー累積滞在時間 · 警告キック回数 · BAN解除時刻 · 最終接続日時
+記録内容: Steam時間数 · プロフィール公開状態 · サーバー累積滞在時間 · 警告キック回数 · BAN段階 · BAN解除時刻 · 最終接続日時
 
 **保存モード**（設定で切り替え可能）:
 - **即時保存**（デフォルト）— 変更のたびにディスクへ書き込む。小規模サーバー向け。
