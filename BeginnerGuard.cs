@@ -5,7 +5,7 @@ using Oxide.Core;
 
 namespace Oxide.Plugins
 {
-    [Info("Beginner Guard", "Mazurk4_", "1.5.2")]
+    [Info("Beginner Guard", "Mazurk4_", "1.6.0")]
     [Description("Beginner server protection - restricts players by Rust Steam playtime")]
     public class BeginnerGuard : RustPlugin
     {
@@ -70,6 +70,42 @@ namespace Oxide.Plugins
 
             [JsonProperty("Stale record prune age (days, 0 = disabled)")]
             public int StaleRecordPruneAgeDays { get; set; } = 90;
+
+            [JsonProperty("Discord webhook notifications")]
+            public DiscordWebhookConfig DiscordWebhook { get; set; } = new DiscordWebhookConfig();
+        }
+
+        private class DiscordWebhookConfig
+        {
+            [JsonProperty("Webhook URL")]
+            public string Url { get; set; } = string.Empty;
+
+            [JsonProperty("Username")]
+            public string Username { get; set; } = "BeginnerGuard";
+
+            [JsonProperty("Notify when private-profile grace period starts")]
+            public bool NotifyGraceStarted { get; set; } = false;
+
+            [JsonProperty("Notify when private-profile grace period expires and player is kicked")]
+            public bool NotifyGraceExpired { get; set; } = false;
+
+            [JsonProperty("Notify when private-profile warning kick occurs")]
+            public bool NotifyWarningKick { get; set; } = false;
+
+            [JsonProperty("Notify when temporary BAN is issued")]
+            public bool NotifyBanIssued { get; set; } = false;
+
+            [JsonProperty("Notify when a banned reconnect is blocked")]
+            public bool NotifyBannedReconnect { get; set; } = false;
+
+            [JsonProperty("Notify when a BAN expires automatically")]
+            public bool NotifyBanExpired { get; set; } = false;
+
+            [JsonProperty("Notify when bg.unban is used")]
+            public bool NotifyManualUnban { get; set; } = false;
+
+            [JsonProperty("Notify when an over-limit player is kicked")]
+            public bool NotifyOverLimitKick { get; set; } = false;
         }
 
         protected override void LoadDefaultConfig()
@@ -113,6 +149,9 @@ namespace Oxide.Plugins
 
         private void ValidateConfig()
         {
+            if (_config.DiscordWebhook == null)
+                _config.DiscordWebhook = new DiscordWebhookConfig();
+
             _config.MaxSteamHours = ValidateNonNegative(_config.MaxSteamHours,
                 "Max allowed Rust playtime on Steam (hours)", 1000);
             _config.PrivateProfileMaxMinutes = ValidateNonNegative(_config.PrivateProfileMaxMinutes,
@@ -133,6 +172,9 @@ namespace Oxide.Plugins
                 "Data save interval (seconds)", 300f);
             _config.StaleRecordPruneAgeDays = ValidateNonNegative(_config.StaleRecordPruneAgeDays,
                 "Stale record prune age (days, 0 = disabled)", 90, 365000); // 1000 years
+
+            if (string.IsNullOrWhiteSpace(_config.DiscordWebhook.Username))
+                _config.DiscordWebhook.Username = "BeginnerGuard";
         }
 
         private float ValidatePositive(float value, string name, float fallback,
@@ -247,6 +289,24 @@ namespace Oxide.Plugins
                 = new Dictionary<string, PlayerRecord>();
         }
 
+        private class DiscordWebhookPayload
+        {
+            [JsonProperty("username")]
+            public string Username { get; set; }
+
+            [JsonProperty("content")]
+            public string Content { get; set; }
+
+            [JsonProperty("allowed_mentions")]
+            public DiscordAllowedMentions AllowedMentions { get; set; } = new DiscordAllowedMentions();
+        }
+
+        private class DiscordAllowedMentions
+        {
+            [JsonProperty("parse")]
+            public string[] Parse { get; set; } = new string[0];
+        }
+
         private void LoadData()
         {
             try
@@ -320,6 +380,9 @@ namespace Oxide.Plugins
 
             if (!HasUsableSteamApiKey())
                 PrintError("Steam API key is not configured. Player checks will remain disabled until a valid key is set.");
+
+            if (AnyDiscordNotificationEnabled() && !HasUsableDiscordWebhook())
+                PrintWarning("Discord notifications are enabled, but Webhook URL is missing or invalid.");
         }
 
         private void OnServerInitialized()
@@ -388,6 +451,9 @@ namespace Oxide.Plugins
                     var remainingHours = totalMinutes / 60;
                     var remainingMinutes = totalMinutes % 60;
                     DebugLog($"{player.displayName} is BAN'd for another {rem.TotalMinutes:F0} min.");
+                    NotifyDiscord(_config.DiscordWebhook.NotifyBannedReconnect,
+                        "Banned reconnect blocked", player,
+                        $"Remaining: {remainingHours}h {remainingMinutes}m");
                     KickPlayer(player,
                         GetMsg("PrivateProfile.BanConnectKick", player, remainingHours, remainingMinutes));
                     return;
@@ -397,6 +463,9 @@ namespace Oxide.Plugins
                 record.BannedUntil      = null;
                 record.PrivateKickCount = 0;
                 SaveData();  // flush BAN lift immediately
+                NotifyDiscord(_config.DiscordWebhook.NotifyBanExpired,
+                    "BAN expired automatically", player,
+                    "The player will now be checked normally.");
             }
 
             record.LastJoinTime = DateTime.UtcNow;
@@ -635,8 +704,16 @@ namespace Oxide.Plugins
                 double remaining = _config.PrivateProfileMaxMinutes - totalMinutes;
                 SendMsg(player, GetMsg("PrivateProfile.GraceWarn", player, remaining.ToString("F0")));
 
+                NotifyDiscord(_config.DiscordWebhook.NotifyGraceStarted,
+                    "Private-profile grace period started", player,
+                    $"Server playtime: {totalMinutes:F1}/{_config.PrivateProfileMaxMinutes} min\n" +
+                    $"Grace remaining: {remaining:F0} min");
+
                 ScheduleKick(player, (float)(remaining * 60f),
-                    GetMsg("PrivateProfile.GraceKickReason", player));
+                    GetMsg("PrivateProfile.GraceKickReason", player),
+                    () => NotifyDiscord(_config.DiscordWebhook.NotifyGraceExpired,
+                        "Private-profile grace period expired", player,
+                        $"Server playtime limit: {_config.PrivateProfileMaxMinutes} min\nAction: kicked"));
                 return;
             }
 
@@ -653,6 +730,9 @@ namespace Oxide.Plugins
                 double banHours = _config.BanDurationSeconds / 3600.0;
                 Puts($"[BeginnerGuard] BAN issued to {player.displayName} ({player.UserIDString}) " +
                      $"for {banHours:F0}h — Steam playtime unavailable.");
+                NotifyDiscord(_config.DiscordWebhook.NotifyBanIssued,
+                    "Temporary BAN issued", player,
+                    $"Duration: {banHours:F0}h\nReason: Steam playtime unavailable after warnings");
                 KickPlayer(player,
                     GetMsg("PrivateProfile.BanKickReason", player, banHours.ToString("F0")));
             }
@@ -660,16 +740,20 @@ namespace Oxide.Plugins
             {
                 // Warning kick
                 record.PrivateKickCount++;
+                int warningNumber = record.PrivateKickCount;
                 MarkDirty();
 
                 SendMsg(player, GetMsg("PrivateProfile.WarnKick", player,
                     _config.PrivateProfileKickDelaySeconds.ToString("F0"),
-                    record.PrivateKickCount,
+                    warningNumber,
                     _config.KickCountBeforeBan,
                     (_config.BanDurationSeconds / 3600).ToString("F0")));
 
                 ScheduleKick(player, _config.PrivateProfileKickDelaySeconds,
-                    GetMsg("PrivateProfile.WarnKickReason", player));
+                    GetMsg("PrivateProfile.WarnKickReason", player),
+                    () => NotifyDiscord(_config.DiscordWebhook.NotifyWarningKick,
+                        "Private-profile warning kick", player,
+                        $"Warning: {warningNumber}/{_config.KickCountBeforeBan}\nAction: kicked"));
             }
         }
 
@@ -681,7 +765,10 @@ namespace Oxide.Plugins
                 hours, _config.MaxSteamHours, _config.OverLimitKickDelaySeconds.ToString("F0")));
 
             ScheduleKick(player, _config.OverLimitKickDelaySeconds,
-                GetMsg("OverLimit.KickReason", player, hours, _config.MaxSteamHours));
+                GetMsg("OverLimit.KickReason", player, hours, _config.MaxSteamHours),
+                () => NotifyDiscord(_config.DiscordWebhook.NotifyOverLimitKick,
+                    "Steam playtime limit exceeded", player,
+                    $"Steam Rust playtime: {hours}h (limit: {_config.MaxSteamHours}h)\nAction: kicked"));
         }
 
         // ---------------------------------------------------------------
@@ -694,7 +781,8 @@ namespace Oxide.Plugins
             return false;
         }
 
-        private void ScheduleKick(BasePlayer player, float delaySec, string reason)
+        private void ScheduleKick(BasePlayer player, float delaySec, string reason,
+            Action beforeKick = null)
         {
             var sid = player.UserIDString;
             if (HasPendingKick(sid)) return;
@@ -702,7 +790,11 @@ namespace Oxide.Plugins
             _pendingKickTimers[sid] = timer.Once(delaySec, () =>
             {
                 _pendingKickTimers.Remove(sid);
-                if (player.IsConnected && !IsExempt(player)) KickPlayer(player, reason);
+                if (player.IsConnected && !IsExempt(player))
+                {
+                    beforeKick?.Invoke();
+                    KickPlayer(player, reason);
+                }
             });
         }
 
@@ -749,6 +841,63 @@ namespace Oxide.Plugins
         {
             return !string.IsNullOrWhiteSpace(_config.SteamApiKey) &&
                    _config.SteamApiKey != "YOUR_STEAM_API_KEY_HERE";
+        }
+
+        private bool AnyDiscordNotificationEnabled()
+        {
+            var webhook = _config?.DiscordWebhook;
+            return webhook != null &&
+                (webhook.NotifyGraceStarted || webhook.NotifyGraceExpired ||
+                 webhook.NotifyWarningKick || webhook.NotifyBanIssued ||
+                 webhook.NotifyBannedReconnect || webhook.NotifyBanExpired ||
+                 webhook.NotifyManualUnban || webhook.NotifyOverLimitKick);
+        }
+
+        private bool HasUsableDiscordWebhook()
+        {
+            var url = _config?.DiscordWebhook?.Url;
+            if (string.IsNullOrWhiteSpace(url)) return false;
+
+            Uri uri;
+            return Uri.TryCreate(url, UriKind.Absolute, out uri) &&
+                   uri.Scheme == Uri.UriSchemeHttps;
+        }
+
+        private void NotifyDiscord(bool enabled, string stage, BasePlayer player, string details)
+        {
+            NotifyDiscord(enabled, stage, player?.displayName ?? "Unknown",
+                player?.UserIDString ?? "unknown", details);
+        }
+
+        private void NotifyDiscord(bool enabled, string stage, string displayName,
+            string steamId, string details)
+        {
+            if (!enabled || !HasUsableDiscordWebhook()) return;
+
+            var payload = new DiscordWebhookPayload
+            {
+                Username = _config.DiscordWebhook.Username,
+                Content = $"**BeginnerGuard — {stage}**\n" +
+                          $"Player: {displayName} ({steamId})\n" +
+                          details
+            };
+            var headers = new Dictionary<string, string>
+            {
+                ["Content-Type"] = "application/json"
+            };
+
+            webrequest.Enqueue(_config.DiscordWebhook.Url,
+                JsonConvert.SerializeObject(payload), (code, response) =>
+                {
+                    if (code >= 200 && code < 300)
+                    {
+                        DebugLog($"Discord webhook sent: {stage} for {steamId}.");
+                        return;
+                    }
+
+                    PrintWarning($"Discord webhook failed for '{stage}' " +
+                                 $"(HTTP {code}): {response}");
+                }, this, Oxide.Core.Libraries.RequestMethod.POST, headers);
         }
 
         private void MarkDirty()
@@ -899,11 +1048,17 @@ namespace Oxide.Plugins
 
             if (_data.Players.TryGetValue(sid, out var r))
             {
+                bool hadActiveBan = r.BannedUntil.HasValue && r.BannedUntil.Value > DateTime.UtcNow;
                 r.BannedUntil      = null;
                 r.PrivateKickCount = 0;
                 SaveData();
                 arg.ReplyWith($"[BeginnerGuard] BAN lifted for {r.DisplayName} ({sid}).");
                 Puts($"[BeginnerGuard] BAN manually lifted for {r.DisplayName} ({sid}).");
+
+                NotifyDiscord(_config.DiscordWebhook.NotifyManualUnban,
+                    "BAN manually lifted", r.DisplayName, sid,
+                    $"Active BAN before command: {(hadActiveBan ? "yes" : "no")}\n" +
+                    "Warning kick count reset to 0.");
             }
             else
             {

@@ -3,7 +3,7 @@
 An [Oxide/uMod](https://umod.org/) plugin for [Rust](https://store.steampowered.com/app/252490/Rust/) that keeps beginner servers beginner-friendly.  
 It checks each player's Steam Rust playtime on connect and removes anyone who has outgrown your server's skill level.
 
-**Version:** 1.5.2 | **Author:** Mazurk4_ | **License:** [MIT](LICENSE)
+**Version:** 1.6.0 | **Author:** Mazurk4_ | **License:** [MIT](LICENSE)
 
 [日本語版 README はこちら](README-JPN.md)
 
@@ -64,6 +64,7 @@ Players are also **periodically re-checked** while they are online.
 - **Multi-language** — English and Japanese built-in; add more via `oxide/lang/`
 - **Configurable save mode** — immediate save (default) or deferred periodic save to reduce disk IO on high-population servers
 - **Stale record pruning** — automatically removes records of players who haven't connected in a configurable number of days (default: 90), keeping the data file lean
+- **Discord webhook notifications** — independently enable notifications for grace, kick, BAN, reconnect, and unban stages
 
 ---
 
@@ -88,6 +89,24 @@ See [`config/BeginnerGuard.json.example`](config/BeginnerGuard.json.example) for
 | `Deferred data save` | `false` | `false` = save on every change (default); `true` = batch writes on a timer (reduces disk IO on busy servers) |
 | `Data save interval (seconds)` | `300` | How often deferred saves are flushed to disk — only used when `Deferred data save` is `true` |
 | `Stale record prune age (days, 0 = disabled)` | `90` | Player records older than this are removed automatically on startup; `0` disables pruning |
+| `Discord webhook notifications` | See below | Discord Webhook URL, display name, and per-stage notification switches |
+
+### Discord webhook notifications
+
+Set `Webhook URL` under `Discord webhook notifications`, then enable only the events you need. Every notification is disabled by default.
+
+| Setting | Notification timing |
+|---------|---------------------|
+| `Notify when private-profile grace period starts` | A player enters grace and a grace-expiry kick is scheduled |
+| `Notify when private-profile grace period expires and player is kicked` | The grace period expires and the player is actually kicked |
+| `Notify when private-profile warning kick occurs` | A post-grace warning kick is actually performed |
+| `Notify when temporary BAN is issued` | Warning kicks are exhausted and a temporary BAN is issued |
+| `Notify when a banned reconnect is blocked` | A reconnect attempt is blocked during an active BAN |
+| `Notify when a BAN expires automatically` | An expired BAN is automatically lifted on connection |
+| `Notify when bg.unban is used` | An administrator runs `bg.unban` |
+| `Notify when an over-limit player is kicked` | A player is kicked for exceeding the Steam playtime limit |
+
+Treat the Webhook URL as a secret and never place it in a public repository or log. Discord mentions are disabled in notification payloads.
 
 For Steam playtime to be available, the player must make Steam **Game details** public and disable the option that keeps total playtime private. Steam API failures are handled fail-open to avoid false kicks; the plugin keeps the player connected and retries later.
 
@@ -122,6 +141,16 @@ Requires `beginnerguard.admin` when used from the **in-game F1 console**.
 | `bg.reset <SteamID64>` | Wipe all stored data for a player |
 | `bg.prune` | Immediately remove stale records older than the configured prune age |
 | `bg.debug <on\|off>` | Toggle debug logging without restarting |
+
+### Re-evaluation after `bg.unban`
+
+`bg.unban` immediately clears the BAN expiry and warning-kick count. It does not clear cumulative server playtime or the last Steam result, and the command itself does not start a Steam API check.
+
+- If the player is offline, the normal Steam API check runs on their next connection.
+- If playtime is visible and within the limit, the player is allowed.
+- If playtime remains unavailable and cumulative server time is already over the grace limit, enforcement resumes at warning count `0`.
+- If the player is online and should be checked immediately, run `bg.forcecheck <SteamID64>` afterward.
+- To also clear cumulative server playtime and all other stored state, use `bg.reset <SteamID64>` instead.
 
 ---
 

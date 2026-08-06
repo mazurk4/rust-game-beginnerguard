@@ -15,6 +15,16 @@ namespace Newtonsoft.Json
     public static class JsonConvert
     {
         public static T DeserializeObject<T>(string value) => default(T);
+        public static string SerializeObject(object value) => string.Empty;
+    }
+}
+
+namespace Oxide.Core.Libraries
+{
+    public enum RequestMethod
+    {
+        GET,
+        POST
     }
 }
 
@@ -107,6 +117,14 @@ namespace Oxide.Plugins
             string body,
             Action<int, string> callback,
             object owner) { }
+
+        public void Enqueue(
+            string url,
+            string body,
+            Action<int, string> callback,
+            object owner,
+            Oxide.Core.Libraries.RequestMethod method,
+            Dictionary<string, string> headers) { }
     }
 
     public class DynamicConfigFile
