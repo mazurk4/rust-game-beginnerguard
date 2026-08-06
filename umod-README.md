@@ -36,7 +36,7 @@ Everything is configurable — playtime cap, grace period, kick delays, BAN dura
 
 A free **Steam Web API key** is required: https://steamcommunity.com/dev/apikey
 
-Players must make Steam **Game details** public and make total playtime visible. Steam API failures are handled fail-open and retried later to avoid false kicks.
+Players must make Steam **Game details** public and make total playtime visible. A zero playtime value is treated as unavailable because Steam can return `0` when total playtime is hidden; genuinely new players receive the normal grace period. Steam API failures are handled fail-open and retried later to avoid false kicks.
 
 ---
 

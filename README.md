@@ -108,7 +108,7 @@ Set `Webhook URL` under `Discord webhook notifications`, then enable only the ev
 
 Treat the Webhook URL as a secret and never place it in a public repository or log. Discord mentions are disabled in notification payloads.
 
-For Steam playtime to be available, the player must make Steam **Game details** public and disable the option that keeps total playtime private. Steam API failures are handled fail-open to avoid false kicks; the plugin keeps the player connected and retries later.
+For Steam playtime to be available, the player must make Steam **Game details** public and disable the option that keeps total playtime private. A zero playtime value is treated as unavailable because Steam can return `0` when total playtime is hidden; genuinely new players remain protected by the normal grace period. Steam API failures are handled fail-open to avoid false kicks; the plugin keeps the player connected and retries later.
 
 ---
 

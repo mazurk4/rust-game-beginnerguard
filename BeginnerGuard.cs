@@ -21,6 +21,7 @@ namespace Oxide.Plugins
         // ---------------------------------------------------------------
         private const string PermExempt = "beginnerguard.exempt";
         private const string PermAdmin  = "beginnerguard.admin";
+        private const int RustAppId = 252490;
 
         // ---------------------------------------------------------------
         // Configuration
@@ -568,7 +569,7 @@ namespace Oxide.Plugins
 
             var url = "https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/" +
                       $"?key={_config.SteamApiKey}&steamid={sid}" +
-                      "&include_appinfo=false&appids_filter[0]=252490&format=json";
+                      $"&include_appinfo=false&appids_filter[0]={RustAppId}&format=json";
 
             DebugLog($"Fetching Steam hours for {player.displayName} ({sid})...");
 
@@ -632,18 +633,21 @@ namespace Oxide.Plugins
                         return;
                     }
 
-                    int minutesPlayed = 0;
-                    bool playtimeFound = false;
-                    foreach (var g in games)
-                        if (g.ContainsKey("playtime_forever"))
-                        {
-                            minutesPlayed = Convert.ToInt32(g["playtime_forever"]);
-                            playtimeFound = true;
-                        }
-
-                    if (!playtimeFound)
+                    int minutesPlayed;
+                    if (!TryGetRustPlaytimeMinutes(games, out minutesPlayed))
                     {
-                        DebugLog($"{player.displayName}: Rust playtime is not visible.");
+                        DebugLog($"{player.displayName}: Rust entry or playtime is missing.");
+                        HandlePrivateProfile(player, record);
+                        return;
+                    }
+
+                    // Steam may return playtime_forever=0 when total playtime is
+                    // hidden even though the profile, game, and achievements are
+                    // public. A genuinely new player is handled safely by the
+                    // existing grace period until Steam reports a positive value.
+                    if (minutesPlayed <= 0)
+                    {
+                        DebugLog($"{player.displayName}: Rust playtime is 0 → treating as unavailable.");
                         HandlePrivateProfile(player, record);
                         return;
                     }
@@ -676,6 +680,29 @@ namespace Oxide.Plugins
                 }
 
             }, this);
+        }
+
+        private bool TryGetRustPlaytimeMinutes(
+            List<Dictionary<string, object>> games, out int minutesPlayed)
+        {
+            minutesPlayed = 0;
+
+            foreach (var game in games)
+            {
+                object appIdValue;
+                if (!game.TryGetValue("appid", out appIdValue) ||
+                    Convert.ToInt32(appIdValue) != RustAppId)
+                    continue;
+
+                object playtimeValue;
+                if (!game.TryGetValue("playtime_forever", out playtimeValue))
+                    return false;
+
+                minutesPlayed = Convert.ToInt32(playtimeValue);
+                return true;
+            }
+
+            return false;
         }
 
         // ---------------------------------------------------------------
