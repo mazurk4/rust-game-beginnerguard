@@ -3,7 +3,7 @@
 [Oxide/uMod](https://umod.org/) 向け [Rust](https://store.steampowered.com/app/252490/Rust/) プラグインです。  
 接続してきたプレイヤーの Steam Rust プレイ時間を自動確認し、初心者サーバーを守ります。
 
-**バージョン:** 1.5.2 | **作者:** Mazurk4_ | **ライセンス:** [MIT](LICENSE)
+**バージョン:** 1.6.0 | **作者:** Mazurk4_ | **ライセンス:** [MIT](LICENSE)
 
 ---
 
@@ -62,6 +62,7 @@
 - **多言語対応** — 英語・日本語標準搭載。`oxide/lang/` に追加するだけで他言語も対応可能
 - **保存モード切り替え** — 即時保存（デフォルト）と定期保存（遅延書き込み）を設定で選択可能。大規模サーバーのディスク IO 削減に有効
 - **古いレコードの自動削除** — 設定日数（デフォルト90日）以上接続のないプレイヤーのレコードを起動時に自動削除し、データファイルの肥大化を防ぐ
+- **Discord Webhook 通知** — グレース開始・各種キック・BAN発行/解除など、通知する段階を個別に設定可能
 
 ---
 
@@ -86,8 +87,26 @@
 | `Deferred data save` | `false` | `false` = 変更のたびに即時保存（デフォルト）、`true` = タイマーによる定期保存（大規模サーバー向け） |
 | `Data save interval (seconds)` | `300` | 定期保存の間隔（秒）— `Deferred data save` が `true` のときのみ有効 |
 | `Stale record prune age (days, 0 = disabled)` | `90` | この日数以上接続のないプレイヤーのレコードを起動時に自動削除。`0` で無効 |
+| `Discord webhook notifications` | 下記参照 | Discord Webhook URL、表示名、段階別通知スイッチ |
 
-Steam APIから時間を取得するには、プレイヤー側でSteamの「ゲームの詳細」を公開し、総プレイ時間を非公開にする設定をオフにする必要があります。Steam API障害時は誤判定によるキックを避けるため入場を維持し、設定間隔で再試行します。
+### Discord Webhook 通知
+
+`Discord webhook notifications` の `Webhook URL` に Discord の Webhook URL を設定し、必要な通知だけ `true` にします。デフォルトでは全通知が無効です。
+
+| 通知設定 | 通知タイミング |
+|----------|----------------|
+| `Notify when private-profile grace period starts` | プレイ時間を取得できず、グレース満了キックを予約した時 |
+| `Notify when private-profile grace period expires and player is kicked` | グレースが満了し、実際にキックした時 |
+| `Notify when private-profile warning kick occurs` | グレース超過後の警告キックを実行した時 |
+| `Notify when temporary BAN is issued` | 警告回数を使い果たし、一時BANを発行した時 |
+| `Notify when a banned reconnect is blocked` | BAN中の再接続を拒否した時 |
+| `Notify when a BAN expires automatically` | 接続時に期限切れBANを自動解除した時 |
+| `Notify when bg.unban is used` | 管理者が `bg.unban` を実行した時 |
+| `Notify when an over-limit player is kicked` | Steamプレイ時間上限超過によるキックを実行した時 |
+
+Webhook URL は秘密情報として扱い、公開リポジトリやログに貼らないでください。通知本文では Discord のメンションを無効化しています。
+
+Steam APIから時間を取得するには、プレイヤー側でSteamの「ゲームの詳細」を公開し、総プレイ時間を非公開にする設定をオフにする必要があります。Steamは総プレイ時間が非公開の場合に `0` を返すことがあるため、0時間は取得不能として扱います。本当に初回起動のプレイヤーには通常のグレース期間が適用されます。Steam API障害時は誤判定によるキックを避けるため入場を維持し、設定間隔で再試行します。
 
 ---
 
@@ -120,6 +139,16 @@ oxide.grant user   <SteamID64>  beginnerguard.exempt
 | `bg.reset <SteamID64>` | プレイヤーの保存データを全リセット |
 | `bg.prune` | 設定の保持日数を超えた古いレコードを即時削除 |
 | `bg.debug <on\|off>` | リロードなしでデバッグログのオン/オフ切替 |
+
+### `bg.unban` 後の再判定
+
+`bg.unban` は BAN 期限と警告キック回数を即時にリセットしますが、累積サーバー滞在時間や直近の Steam 判定結果は消去しません。また、コマンド実行だけでは Steam API の再判定を開始しません。
+
+- 対象がオフラインなら、次回接続時に通常どおり Steam API で再判定します。
+- プレイ時間が取得でき、上限以内なら入場できます。
+- プレイ時間を取得できないままで、累積滞在時間が既にグレース上限以上なら、警告回数 `0` から警告キック段階を再開します。
+- オンライン中に解除して即時再判定したい場合は、続けて `bg.forcecheck <SteamID64>` を実行します。
+- 累積滞在時間を含めて完全に初期化する場合は、代わりに `bg.reset <SteamID64>` を使用します。
 
 ---
 

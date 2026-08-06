@@ -12,5 +12,17 @@
   "Enable debug logging": false,
   "Deferred data save (true = periodic timer, false = save on every change)": false,
   "Data save interval (seconds) — used only when Deferred data save is true": 300.0,
-  "Stale record prune age (days, 0 = disabled)": 90
+  "Stale record prune age (days, 0 = disabled)": 90,
+  "Discord webhook notifications": {
+    "Webhook URL": "",
+    "Username": "BeginnerGuard",
+    "Notify when private-profile grace period starts": false,
+    "Notify when private-profile grace period expires and player is kicked": false,
+    "Notify when private-profile warning kick occurs": false,
+    "Notify when temporary BAN is issued": false,
+    "Notify when a banned reconnect is blocked": false,
+    "Notify when a BAN expires automatically": false,
+    "Notify when bg.unban is used": false,
+    "Notify when an over-limit player is kicked": false
+  }
 }
