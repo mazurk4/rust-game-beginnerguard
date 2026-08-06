@@ -3,7 +3,7 @@
 An [Oxide/uMod](https://umod.org/) plugin for [Rust](https://store.steampowered.com/app/252490/Rust/) that keeps beginner servers beginner-friendly.  
 It checks each player's Steam Rust playtime on connect and removes anyone who has outgrown your server's skill level.
 
-**Version:** 1.5.1 | **Author:** Mazurk4_ | **License:** [MIT](LICENSE)
+**Version:** 1.5.2 | **Author:** Mazurk4_ | **License:** [MIT](LICENSE)
 
 [日本語版 README はこちら](README-JPN.md)
 
@@ -11,9 +11,9 @@ It checks each player's Steam Rust playtime on connect and removes anyone who ha
 
 ## Screenshots
 
-![Chat warning — private profile](docs/screenshots/chat-warning.png)
+![Chat warning — Steam playtime unavailable](docs/screenshots/chat-warning.png)
 
-*Orange chat warning shown when a player's Steam profile is set to private*
+*Orange chat warning shown when Steam game details or playtime cannot be read*
 
 ---
 
@@ -23,11 +23,11 @@ When a player joins, the plugin queries the **Steam Web API** for their total Ru
 
 | Situation | Result |
 |-----------|--------|
-| Hours ≤ limit, public profile | Allowed in |
+| Hours ≤ limit, playtime available | Allowed in |
 | Hours > limit | Chat warning → kicked after delay |
-| Private Steam profile, within grace period | Chat warning + kick scheduled at grace expiry |
-| Private profile, over grace (warnings remaining) | Warning kick (counter +1) |
-| Private profile, over grace (warnings exhausted) | Temporary BAN issued |
+| Game details/playtime unavailable, within grace period | Chat warning + kick scheduled at grace expiry |
+| Playtime unavailable, over grace (warnings remaining) | Warning kick (counter +1) |
+| Playtime unavailable, over grace (warnings exhausted) | Temporary BAN issued |
 | Reconnecting while BAN'd | Instant kick showing time remaining |
 
 All chat warnings are shown in **orange** and support multiple languages.  
@@ -56,7 +56,7 @@ Players are also **periodically re-checked** while they are online.
 ## Features
 
 - **Playtime gate** — configurable hour cap; warns then kicks over-limit players
-- **Private profile handling** — grace period → warning kicks → temporary BAN
+- **Unavailable playtime handling** — grace period → warning kicks → temporary BAN
 - **Automatic BAN expiry** — bans lift themselves; no admin action needed
 - **Exempt permission** — whitelist VIPs, staff, and trusted players
 - **Periodic re-check** — re-validates all online players on a schedule
@@ -76,7 +76,7 @@ See [`config/BeginnerGuard.json.example`](config/BeginnerGuard.json.example) for
 |---------|---------|-------------|
 | `Steam API Key` | *(required)* | Your Steam Web API key |
 | `Max allowed Rust playtime on Steam (hours)` | `1000` | Players above this are kicked |
-| `Private profile: max cumulative server playtime before kick (minutes)` | `120` | Total server time a private-profile player is allowed before kick |
+| `Private profile: max cumulative server playtime before kick (minutes)` | `120` | Total server time allowed when a player's Steam playtime is unavailable |
 | `Steam API periodic check interval (seconds)` | `1800` | How often online players are re-checked (default: 30 min) |
 | `Steam API retry interval on failure (seconds)` | `1800` | Retry delay when Steam API is unreachable |
 | `Over-limit player: delay before kick after warning (seconds)` | `300` | Seconds between chat warning and kick |
@@ -88,6 +88,8 @@ See [`config/BeginnerGuard.json.example`](config/BeginnerGuard.json.example) for
 | `Deferred data save` | `false` | `false` = save on every change (default); `true` = batch writes on a timer (reduces disk IO on busy servers) |
 | `Data save interval (seconds)` | `300` | How often deferred saves are flushed to disk — only used when `Deferred data save` is `true` |
 | `Stale record prune age (days, 0 = disabled)` | `90` | Player records older than this are removed automatically on startup; `0` disables pruning |
+
+For Steam playtime to be available, the player must make Steam **Game details** public and disable the option that keeps total playtime private. Steam API failures are handled fail-open to avoid false kicks; the plugin keeps the player connected and retries later.
 
 ---
 
@@ -133,12 +135,14 @@ Player connects
     │
     └─ Fetch Steam API
            │
-           ├─ Private profile or API error
+           ├─ Game details/playtime unavailable
            │       ├─ Within grace period?        → Chat warning + kick scheduled at expiry
            │       ├─ Over grace, warnings left?   → Warning kick (counter +1)
            │       └─ Over grace, warnings used up? → BAN issued
            │
-           └─ Public profile
+           ├─ API error → keep connected and retry
+           │
+           └─ Playtime available
                    ├─ Hours ≤ limit? → Allow
                    └─ Hours > limit? → Chat warning + kick after delay
 ```
@@ -173,7 +177,32 @@ Each record stores: Steam hours · profile visibility · cumulative server playt
 - **Immediate** (default) — data is written to disk on every change. Safe for small servers.
 - **Deferred** — changes are batched and flushed on a periodic timer (`Data save interval`). Reduces disk IO on busy servers. BAN issuance and expiry are always written immediately regardless of this setting.
 
-**Stale record pruning** — on server startup, records of players who have not connected for more than `Stale record prune age` days are deleted automatically. Players who are currently online or still banned are never pruned. Records created before v1.5.0 (no last-seen timestamp) are skipped on the first pass as a migration safety measure.
+**Stale record pruning** — on server startup, records of players who have not connected for more than `Stale record prune age` days are deleted automatically. Players who are currently online or still banned are never pruned. Legacy records without a last-seen timestamp receive a migration timestamp and become eligible after one full retention period.
+
+Temporary BANs are plugin-level restrictions: BeginnerGuard stores an expiry and kicks the player when they reconnect. They are not added to Rust's native ban list and do not apply while the plugin is disabled.
+
+---
+
+## Development Compile Check
+
+With the .NET 8 SDK installed, you can check C# syntax and the shape of the API calls used by the plugin without starting a Rust server:
+
+```bash
+dotnet restore tests/compile/BeginnerGuard.CompileCheck.csproj \
+  --configfile tests/compile/NuGet.Config
+dotnet build tests/compile/BeginnerGuard.CompileCheck.csproj --no-restore
+```
+
+`tests/compile/UmodStubs.cs` contains minimal compile-only definitions for the Rust, uMod, and Newtonsoft.Json APIs. The check uses no external packages, Steam API key, or network access. It does not guarantee full compatibility or in-game behaviour, so changes must still be tested on a local Rust server before release.
+
+### Credential Safety
+
+This is a public repository. Never commit Steam API keys, RCON passwords, server tokens, webhook URLs, or any other credentials.
+
+- Keep the placeholder in [`config/BeginnerGuard.json.example`](config/BeginnerGuard.json.example); never replace it with a real key
+- Store the real key only in the Rust server's `oxide/config/BeginnerGuard.json`
+- Review staged changes with `git diff --cached` before every commit
+- If a credential is added accidentally, revoke and rotate it even if it has not been intentionally published
 
 ---
 

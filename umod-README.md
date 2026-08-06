@@ -2,7 +2,7 @@
 
 **Beginner Guard** automatically keeps over-experienced players off your beginner server.
 
-On connect, each player's Rust playtime is fetched from the Steam Web API. Players over the configured hour limit are warned in chat and kicked after a delay. Players hiding their stats with a private Steam profile are handled separately: they receive a grace period, then escalating warning kicks, and finally a temporary BAN if they keep reconnecting without fixing their privacy settings.
+On connect, each player's Rust playtime is fetched from the Steam Web API. Players over the configured hour limit are warned in chat and kicked after a delay. Players whose game details or playtime cannot be read are handled separately: they receive a grace period, then escalating warning kicks, and finally a temporary BAN if they keep reconnecting without fixing their privacy settings.
 
 Everything is configurable — playtime cap, grace period, kick delays, BAN duration — with no hard-coded values.
 
@@ -10,11 +10,11 @@ Everything is configurable — playtime cap, grace period, kick delays, BAN dura
 
 ## How Players Are Handled
 
-- **Hours ≤ limit, public profile** — Allowed in
+- **Hours ≤ limit, playtime available** — Allowed in
 - **Hours > limit** — Chat warning → kicked after delay
-- **Private profile, within grace period** — Chat warning + kick scheduled at grace expiry
-- **Private profile, over grace (warnings remaining)** — Warning kick
-- **Private profile, warnings exhausted** — Temporary BAN
+- **Game details/playtime unavailable, within grace period** — Chat warning + kick scheduled at grace expiry
+- **Playtime unavailable, over grace (warnings remaining)** — Warning kick
+- **Playtime unavailable, warnings exhausted** — Temporary BAN
 - **Reconnecting while BAN'd** — Instant kick showing time remaining
 
 ---
@@ -22,7 +22,7 @@ Everything is configurable — playtime cap, grace period, kick delays, BAN dura
 ## Features
 
 - Playtime gate with configurable hour cap
-- Private profile: grace period → warning kicks → time-limited BAN
+- Unavailable playtime: grace period → warning kicks → time-limited BAN
 - Automatic BAN expiry — no manual cleanup needed
 - `beginnerguard.exempt` permission to whitelist VIPs and trusted players
 - Periodic re-check of all online players
@@ -34,6 +34,8 @@ Everything is configurable — playtime cap, grace period, kick delays, BAN dura
 ## Requirements
 
 A free **Steam Web API key** is required: https://steamcommunity.com/dev/apikey
+
+Players must make Steam **Game details** public and make total playtime visible. Steam API failures are handled fail-open and retried later to avoid false kicks.
 
 ---
 
@@ -50,7 +52,7 @@ A free **Steam Web API key** is required: https://steamcommunity.com/dev/apikey
 
 - **Steam API Key** *(required)* — Your Steam Web API key
 - **Max allowed Rust playtime (hours)** — default `1000` — Players above this are kicked
-- **Private profile grace period (minutes)** — default `120` — Total server time allowed for private-profile players
+- **Private profile grace period (minutes)** — default `120` — Total server time allowed when Steam playtime is unavailable
 - **Periodic check interval (seconds)** — default `1800` — How often online players are re-checked (30 min)
 - **API retry interval on failure (seconds)** — default `1800` — Retry delay when Steam API is unreachable
 - **Over-limit kick delay (seconds)** — default `300` — Delay between chat warning and kick
@@ -86,6 +88,8 @@ Requires `beginnerguard.admin` when used from the **in-game F1 console**.
 - `bg.forcecheck <SteamID64>` — Force an immediate Steam API check (player must be online)
 - `bg.reset <SteamID64>` — Clear all stored data for a player
 - `bg.debug <on|off>` — Toggle debug logging without a reload
+
+Temporary BANs are enforced by this plugin on reconnect; they are not added to Rust's native ban list.
 
 ---
 

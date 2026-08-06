@@ -5,7 +5,7 @@ using Oxide.Core;
 
 namespace Oxide.Plugins
 {
-    [Info("Beginner Guard", "Mazurk4_", "1.5.1")]
+    [Info("Beginner Guard", "Mazurk4_", "1.5.2")]
     [Description("Beginner server protection - restricts players by Rust Steam playtime")]
     public class BeginnerGuard : RustPlugin
     {
@@ -84,16 +84,80 @@ namespace Oxide.Plugins
             try
             {
                 _config = Config.ReadObject<PluginConfig>();
-                if (_config == null) LoadDefaultConfig();
+                if (_config == null)
+                {
+                    LoadDefaultConfig();
+                    return;
+                }
+
+                ValidateConfig();
             }
             catch
             {
                 PrintError("Failed to load config.json — using defaults.");
                 LoadDefaultConfig();
+                return;
+            }
+
+            try
+            {
+                SaveConfig(); // Persist defaults added by newer plugin versions.
+            }
+            catch (Exception ex)
+            {
+                PrintWarning($"Config loaded but could not be updated: {ex.Message}");
             }
         }
 
         protected override void SaveConfig() => Config.WriteObject(_config);
+
+        private void ValidateConfig()
+        {
+            _config.MaxSteamHours = ValidateNonNegative(_config.MaxSteamHours,
+                "Max allowed Rust playtime on Steam (hours)", 1000);
+            _config.PrivateProfileMaxMinutes = ValidateNonNegative(_config.PrivateProfileMaxMinutes,
+                "Private profile: max cumulative server playtime before kick (minutes)", 120);
+            _config.CheckIntervalSeconds = ValidatePositive(_config.CheckIntervalSeconds,
+                "Steam API periodic check interval (seconds)", 1800f);
+            _config.ApiRetryIntervalSeconds = ValidatePositive(_config.ApiRetryIntervalSeconds,
+                "Steam API retry interval on failure (seconds)", 1800f);
+            _config.OverLimitKickDelaySeconds = ValidateNonNegative(_config.OverLimitKickDelaySeconds,
+                "Over-limit player: delay before kick after warning (seconds)", 300f);
+            _config.PrivateProfileKickDelaySeconds = ValidateNonNegative(_config.PrivateProfileKickDelaySeconds,
+                "Private profile: delay before kick after warning (seconds)", 300f);
+            _config.KickCountBeforeBan = ValidateNonNegative(_config.KickCountBeforeBan,
+                "Private profile: max warning kicks before BAN", 2);
+            _config.BanDurationSeconds = ValidatePositive(_config.BanDurationSeconds,
+                "BAN duration (seconds)", 86400f, 315360000f); // 10 years
+            _config.DataSaveIntervalSeconds = ValidatePositive(_config.DataSaveIntervalSeconds,
+                "Data save interval (seconds)", 300f);
+            _config.StaleRecordPruneAgeDays = ValidateNonNegative(_config.StaleRecordPruneAgeDays,
+                "Stale record prune age (days, 0 = disabled)", 90, 365000); // 1000 years
+        }
+
+        private float ValidatePositive(float value, string name, float fallback,
+            float maximum = float.MaxValue)
+        {
+            if (value > 0f && value <= maximum && !float.IsNaN(value) && !float.IsInfinity(value))
+                return value;
+            PrintWarning($"Invalid config value for '{name}' ({value}); using {fallback}.");
+            return fallback;
+        }
+
+        private float ValidateNonNegative(float value, string name, float fallback)
+        {
+            if (value >= 0f && !float.IsNaN(value) && !float.IsInfinity(value)) return value;
+            PrintWarning($"Invalid config value for '{name}' ({value}); using {fallback}.");
+            return fallback;
+        }
+
+        private int ValidateNonNegative(int value, string name, int fallback,
+            int maximum = int.MaxValue)
+        {
+            if (value >= 0 && value <= maximum) return value;
+            PrintWarning($"Invalid config value for '{name}' ({value}); using {fallback}.");
+            return fallback;
+        }
 
         // ---------------------------------------------------------------
         // Localization  →  oxide/lang/{lang}/BeginnerGuard.json
@@ -103,12 +167,12 @@ namespace Oxide.Plugins
             // English (default)
             lang.RegisterMessages(new Dictionary<string, string>
             {
-                ["PrivateProfile.GraceWarn"]       = "<color=#FFA500>[BeginnerGuard] Your Steam profile is set to private.\nYou will be kicked in approximately {0} minute(s) if it remains private.\nHow to fix: Steam → Profile → Edit Profile → Privacy Settings → set to Public.</color>",
-                ["PrivateProfile.GraceKickReason"] = "[BeginnerGuard] Kicked: cumulative server playtime limit reached.\nPlease set your Steam profile to public and reconnect.",
-                ["PrivateProfile.WarnKick"]        = "<color=#FFA500>[BeginnerGuard] Your Steam profile is private!\nPlease set it to public within {0}s.\nWarning {1}/{2} — a {3}h BAN will be issued if you exceed this.\nHow to fix: Steam → Profile → Edit Profile → Privacy Settings → Public.</color>",
-                ["PrivateProfile.WarnKickReason"]  = "[BeginnerGuard] Kicked: Steam profile is private.\nPlease set your profile to public and reconnect.",
-                ["PrivateProfile.BanKickReason"]   = "[BeginnerGuard] You have been banned for {0} hour(s).\nReason: Steam profile remained private after repeated warnings.\nPlease set your Steam profile to public before reconnecting.\nHow to fix: Steam → Profile → Edit Profile → Privacy Settings → Public.",
-                ["PrivateProfile.BanConnectKick"]  = "[BeginnerGuard] You are banned. Ban expires in: {0}h {1}m\nPlease set your Steam profile to public before reconnecting.",
+                ["PrivateProfile.GraceWarn"]       = "<color=#FFA500>[BeginnerGuard] Your Steam game details or playtime are not public.\nYou will be kicked in approximately {0} minute(s) if they remain hidden.\nHow to fix: Steam → Profile → Edit Profile → Privacy Settings → set Game details to Public and make total playtime visible.</color>",
+                ["PrivateProfile.GraceKickReason"] = "[BeginnerGuard] Kicked: cumulative server playtime limit reached.\nPlease make your Steam game details and total playtime public, then reconnect.",
+                ["PrivateProfile.WarnKick"]        = "<color=#FFA500>[BeginnerGuard] Your Steam game details or playtime are hidden!\nPlease make them public within {0}s.\nWarning {1}/{2} — a {3}h BAN will be issued if you exceed this.\nHow to fix: Steam → Profile → Edit Profile → Privacy Settings → Game details: Public; total playtime: visible.</color>",
+                ["PrivateProfile.WarnKickReason"]  = "[BeginnerGuard] Kicked: Steam game details or playtime are hidden.\nPlease make them public and reconnect.",
+                ["PrivateProfile.BanKickReason"]   = "[BeginnerGuard] You have been banned for {0} hour(s).\nReason: Steam game details or playtime remained hidden after repeated warnings.\nPlease make both public before reconnecting.",
+                ["PrivateProfile.BanConnectKick"]  = "[BeginnerGuard] You are banned. Ban expires in: {0}h {1}m\nPlease make your Steam game details and total playtime public before reconnecting.",
                 ["OverLimit.Warn"]                 = "<color=#FFA500>[BeginnerGuard] This is a beginner-only server.\nYour Rust playtime on Steam: {0}h (limit: {1}h).\nYou will be kicked in {2}s. Please find a server that matches your experience level.</color>",
                 ["OverLimit.KickReason"]           = "[BeginnerGuard] Kicked: playtime too high ({0}h / limit {1}h).\nThis server is for beginners only. Thanks for understanding!",
             }, this);
@@ -116,12 +180,12 @@ namespace Oxide.Plugins
             // Japanese
             lang.RegisterMessages(new Dictionary<string, string>
             {
-                ["PrivateProfile.GraceWarn"]       = "<color=#FFA500>[BeginnerGuard] あなたのSteamプロフィールは非公開に設定されています。\nこのまま非公開の場合、約{0}分後にキックされます。\n修正方法: Steam → プロフィール → プロフィールを編集 → プライバシー設定 → 公開に変更</color>",
-                ["PrivateProfile.GraceKickReason"] = "[BeginnerGuard] キック: サーバー滞在時間の上限に達しました。\nSteamプロフィールを公開に設定して再接続してください。",
-                ["PrivateProfile.WarnKick"]        = "<color=#FFA500>[BeginnerGuard] あなたのSteamプロフィールが非公開です！\n{0}秒以内に公開に設定してください。\n警告 {1}/{2} — 超過した場合は{3}時間のBANが適用されます。\n修正方法: Steam → プロフィール → プロフィールを編集 → プライバシー設定 → 公開</color>",
-                ["PrivateProfile.WarnKickReason"]  = "[BeginnerGuard] キック: Steamプロフィールが非公開です。\nプロフィールを公開に設定して再接続してください。",
-                ["PrivateProfile.BanKickReason"]   = "[BeginnerGuard] {0}時間のBANが適用されました。\n理由: 警告後もSteamプロフィールが非公開のままでした。\n再接続前にSteamプロフィールを公開に設定してください。\n修正方法: Steam → プロフィール → プロフィールを編集 → プライバシー設定 → 公開",
-                ["PrivateProfile.BanConnectKick"]  = "[BeginnerGuard] BANされています。解除まで: {0}時間{1}分\n再接続前にSteamプロフィールを公開に設定してください。",
+                ["PrivateProfile.GraceWarn"]       = "<color=#FFA500>[BeginnerGuard] Steamのゲーム詳細またはプレイ時間が公開されていません。\nこのまま確認できない場合、約{0}分後にキックされます。\n修正方法: Steam → プロフィール → プロフィールを編集 → プライバシー設定 → ゲームの詳細を公開し、総プレイ時間も表示</color>",
+                ["PrivateProfile.GraceKickReason"] = "[BeginnerGuard] キック: サーバー滞在時間の上限に達しました。\nSteamのゲーム詳細と総プレイ時間を公開して再接続してください。",
+                ["PrivateProfile.WarnKick"]        = "<color=#FFA500>[BeginnerGuard] Steamのゲーム詳細またはプレイ時間を確認できません！\n{0}秒以内に公開してください。\n警告 {1}/{2} — 超過した場合は{3}時間のBANが適用されます。\n修正方法: Steam → プロフィール → プロフィールを編集 → プライバシー設定 → ゲームの詳細: 公開、総プレイ時間: 表示</color>",
+                ["PrivateProfile.WarnKickReason"]  = "[BeginnerGuard] キック: Steamのゲーム詳細またはプレイ時間を確認できません。\n両方を公開して再接続してください。",
+                ["PrivateProfile.BanKickReason"]   = "[BeginnerGuard] {0}時間のBANが適用されました。\n理由: 警告後もSteamのゲーム詳細またはプレイ時間を確認できませんでした。\n再接続前に両方を公開してください。",
+                ["PrivateProfile.BanConnectKick"]  = "[BeginnerGuard] BANされています。解除まで: {0}時間{1}分\n再接続前にSteamのゲーム詳細と総プレイ時間を公開してください。",
                 ["OverLimit.Warn"]                 = "<color=#FFA500>[BeginnerGuard] このサーバーは初心者専用です。\nあなたのRust Steamプレイ時間: {0}時間（上限: {1}時間）\n{2}秒後にキックされます。ご自身の経験に合ったサーバーをお探しください。</color>",
                 ["OverLimit.KickReason"]           = "[BeginnerGuard] キック: プレイ時間が超過しています（{0}時間 / 上限 {1}時間）\nこのサーバーは初心者専用です。ご理解ありがとうございます！",
             }, this, "ja");
@@ -221,6 +285,7 @@ namespace Oxide.Plugins
                 _data.Players[sid] = record;
                 DebugLog($"Created new record for {player.displayName} ({sid}).");
             }
+            record.SteamId = sid; // Backfill records created by older versions.
             record.DisplayName = player.displayName;
             return record;
         }
@@ -233,6 +298,11 @@ namespace Oxide.Plugins
         private bool  _dataDirty = false;
         private readonly Dictionary<string, Timer> _pendingKickTimers
             = new Dictionary<string, Timer>();
+        private readonly Dictionary<string, Timer> _steamRetryTimers
+            = new Dictionary<string, Timer>();
+        private readonly Dictionary<string, long> _steamChecksInFlight
+            = new Dictionary<string, long>();
+        private long _nextSteamCheckToken = 0;
 
         // ---------------------------------------------------------------
         // Oxide Hooks
@@ -247,11 +317,20 @@ namespace Oxide.Plugins
             Puts($"  Exempt permission : {PermExempt}");
             Puts($"  Admin permission  : {PermAdmin}");
             Puts($"  Debug logging     : {(_config.DebugLogging ? "ON" : "OFF")}");
+
+            if (!HasUsableSteamApiKey())
+                PrintError("Steam API key is not configured. Player checks will remain disabled until a valid key is set.");
         }
 
         private void OnServerInitialized()
         {
+            RecoverOfflineSessions();
             PruneStaleRecords();
+
+            // On hot reload, already-connected players do not necessarily emit
+            // OnPlayerConnected again. Initialise and check them immediately.
+            foreach (var player in new List<BasePlayer>(BasePlayer.activePlayerList))
+                OnPlayerConnected(player);
 
             _periodicCheckTimer = timer.Every(_config.CheckIntervalSeconds, () =>
             {
@@ -274,9 +353,14 @@ namespace Oxide.Plugins
 
         private void Unload()
         {
+            SnapshotActiveSessions();
             _periodicCheckTimer?.Destroy();
             _dataSaveTimer?.Destroy();
             foreach (var t in _pendingKickTimers.Values) t?.Destroy();
+            foreach (var t in _steamRetryTimers.Values) t?.Destroy();
+            _pendingKickTimers.Clear();
+            _steamRetryTimers.Clear();
+            _steamChecksInFlight.Clear();
             FlushDataIfDirty();
             Puts("BeginnerGuard unloaded.");
         }
@@ -285,6 +369,9 @@ namespace Oxide.Plugins
         {
             if (IsExempt(player))
             {
+                CancelPendingKick(player.UserIDString);
+                CancelSteamRetry(player.UserIDString);
+                InvalidateSteamCheck(player.UserIDString);
                 DebugLog($"{player.displayName} ({player.UserIDString}) is exempt — skipping.");
                 return;
             }
@@ -297,9 +384,12 @@ namespace Oxide.Plugins
                 if (DateTime.UtcNow < record.BannedUntil.Value)
                 {
                     var rem = record.BannedUntil.Value - DateTime.UtcNow;
+                    var totalMinutes = Math.Max(1L, (long)Math.Ceiling(rem.TotalMinutes));
+                    var remainingHours = totalMinutes / 60;
+                    var remainingMinutes = totalMinutes % 60;
                     DebugLog($"{player.displayName} is BAN'd for another {rem.TotalMinutes:F0} min.");
                     KickPlayer(player,
-                        GetMsg("PrivateProfile.BanConnectKick", player, rem.Hours, rem.Minutes));
+                        GetMsg("PrivateProfile.BanConnectKick", player, remainingHours, remainingMinutes));
                     return;
                 }
                 // Expired — auto-lift
@@ -319,11 +409,14 @@ namespace Oxide.Plugins
         private void OnPlayerDisconnected(BasePlayer player, string reason)
         {
             CancelPendingKick(player.UserIDString);
+            CancelSteamRetry(player.UserIDString);
+            InvalidateSteamCheck(player.UserIDString);
 
             if (!_data.Players.TryGetValue(player.UserIDString, out var record)) return;
             if (!record.LastJoinTime.HasValue) return;
 
-            double session = (DateTime.UtcNow - record.LastJoinTime.Value).TotalMinutes;
+            double session = Math.Max(0.0,
+                (DateTime.UtcNow - record.LastJoinTime.Value).TotalMinutes);
             record.ServerPlaytimeMinutes += session;
             record.LastJoinTime           = null;
             record.LastSeen               = DateTime.UtcNow;
@@ -333,14 +426,77 @@ namespace Oxide.Plugins
             MarkDirty();
         }
 
+        private void RecoverOfflineSessions()
+        {
+            var activeIds = new HashSet<string>();
+            foreach (var player in BasePlayer.activePlayerList)
+                activeIds.Add(player.UserIDString);
+
+            bool changed = false;
+            foreach (var entry in _data.Players)
+            {
+                var record = entry.Value;
+                if (!record.LastJoinTime.HasValue || activeIds.Contains(entry.Key)) continue;
+
+                // A persisted join without an active player means the previous
+                // shutdown did not receive a disconnect hook. Do not count
+                // server downtime as playtime; retain the join as last-seen data.
+                if (record.LastSeen == DateTime.MinValue || record.LastSeen < record.LastJoinTime.Value)
+                    record.LastSeen = record.LastJoinTime.Value;
+                record.LastJoinTime = null;
+                changed = true;
+            }
+
+            if (changed) SaveData();
+        }
+
+        private void SnapshotActiveSessions()
+        {
+            bool changed = false;
+            var now = DateTime.UtcNow;
+
+            foreach (var player in BasePlayer.activePlayerList)
+            {
+                if (!_data.Players.TryGetValue(player.UserIDString, out var record)) continue;
+                if (!record.LastJoinTime.HasValue) continue;
+
+                record.ServerPlaytimeMinutes += Math.Max(0.0,
+                    (now - record.LastJoinTime.Value).TotalMinutes);
+                record.LastJoinTime = null;
+                record.LastSeen = now;
+                changed = true;
+            }
+
+            if (!changed) return;
+            SaveData();
+            _dataDirty = false;
+        }
+
         // ---------------------------------------------------------------
         // Steam API
         // ---------------------------------------------------------------
         private void FetchAndProcessSteamHours(BasePlayer player)
         {
-            if (IsExempt(player)) return;
-
             var sid = player.UserIDString;
+            if (IsExempt(player))
+            {
+                CancelPendingKick(sid);
+                CancelSteamRetry(sid);
+                InvalidateSteamCheck(sid);
+                return;
+            }
+
+            if (!HasUsableSteamApiKey()) return;
+
+            if (_steamChecksInFlight.ContainsKey(sid))
+            {
+                DebugLog($"Steam check already in progress for {player.displayName} ({sid}) — skipping duplicate.");
+                return;
+            }
+
+            var checkToken = ++_nextSteamCheckToken;
+            _steamChecksInFlight[sid] = checkToken;
+
             var url = "https://api.steampowered.com/IPlayerService/GetOwnedGames/v1/" +
                       $"?key={_config.SteamApiKey}&steamid={sid}" +
                       "&include_appinfo=false&appids_filter[0]=252490&format=json";
@@ -349,9 +505,23 @@ namespace Oxide.Plugins
 
             webrequest.Enqueue(url, null, (code, response) =>
             {
+                if (!_steamChecksInFlight.TryGetValue(sid, out var activeToken) || activeToken != checkToken)
+                {
+                    DebugLog($"Ignoring stale Steam response for {player.displayName} ({sid}).");
+                    return;
+                }
+                _steamChecksInFlight.Remove(sid);
+
                 if (!player.IsConnected)
                 {
                     DebugLog($"{player.displayName} disconnected before API response — ignoring.");
+                    return;
+                }
+
+                if (IsExempt(player))
+                {
+                    CancelPendingKick(sid);
+                    CancelSteamRetry(sid);
                     return;
                 }
 
@@ -362,13 +532,11 @@ namespace Oxide.Plugins
                 {
                     PrintWarning($"[BeginnerGuard] Steam API failed (HTTP {code}) for {player.displayName}. " +
                                  $"Retrying in {_config.ApiRetryIntervalSeconds}s.");
-                    timer.Once(_config.ApiRetryIntervalSeconds, () =>
-                    {
-                        if (player.IsConnected) FetchAndProcessSteamHours(player);
-                    });
+                    ScheduleSteamRetry(player);
                     return;
                 }
 
+                CancelSteamRetry(sid);
                 DebugLog($"Steam API response received for {player.displayName} (HTTP {code}).");
 
                 try
@@ -377,10 +545,10 @@ namespace Oxide.Plugins
                     var respObj = JsonConvert.DeserializeObject<Dictionary<string, object>>(
                                       root["response"].ToString());
 
-                    // game_count missing or 0 → private profile / Rust not owned
+                    // game_count missing or 0 → game details/playtime unavailable
                     if (!respObj.ContainsKey("game_count") || respObj["game_count"].ToString() == "0")
                     {
-                        DebugLog($"{player.displayName}: game_count=0 or missing → private/not owned.");
+                        DebugLog($"{player.displayName}: game_count=0 or missing → playtime unavailable.");
                         HandlePrivateProfile(player, record);
                         return;
                     }
@@ -390,34 +558,52 @@ namespace Oxide.Plugins
 
                     if (games == null || games.Count == 0)
                     {
-                        DebugLog($"{player.displayName}: games list empty → private/not owned.");
+                        DebugLog($"{player.displayName}: games list empty → playtime unavailable.");
                         HandlePrivateProfile(player, record);
                         return;
                     }
 
                     int minutesPlayed = 0;
+                    bool playtimeFound = false;
                     foreach (var g in games)
                         if (g.ContainsKey("playtime_forever"))
+                        {
                             minutesPlayed = Convert.ToInt32(g["playtime_forever"]);
+                            playtimeFound = true;
+                        }
+
+                    if (!playtimeFound)
+                    {
+                        DebugLog($"{player.displayName}: Rust playtime is not visible.");
+                        HandlePrivateProfile(player, record);
+                        return;
+                    }
 
                     int hours = minutesPlayed / 60;
+                    bool overLimit = minutesPlayed > _config.MaxSteamHours * 60L;
                     record.SteamTotalHours  = hours;
                     record.IsProfilePrivate = false;
                     record.LastSteamCheck   = DateTime.UtcNow;
+                    if (!overLimit) record.PrivateKickCount = 0;
                     MarkDirty();
 
                     Puts($"[BeginnerGuard] {player.displayName} — Steam Rust hours: {hours}h " +
                          $"(limit: {_config.MaxSteamHours}h)");
 
-                    if (hours > _config.MaxSteamHours)
+                    if (overLimit)
                         HandleOverLimitPlayer(player, record, hours);
                     else
+                    {
+                        CancelPendingKick(sid);
                         DebugLog($"{player.displayName} is within the hour limit — allowed.");
+                    }
                 }
                 catch (Exception ex)
                 {
                     PrintError($"[BeginnerGuard] Failed to parse Steam API response for " +
-                               $"{player.displayName}: {ex.Message}");
+                               $"{player.displayName}: {ex.Message}. " +
+                               $"Retrying in {_config.ApiRetryIntervalSeconds}s.");
+                    ScheduleSteamRetry(player);
                 }
 
             }, this);
@@ -436,13 +622,15 @@ namespace Oxide.Plugins
                 ? (DateTime.UtcNow - record.LastJoinTime.Value).TotalMinutes : 0.0;
             double totalMinutes   = record.ServerPlaytimeMinutes + currentSession;
 
-            DebugLog($"{player.displayName}: private profile. " +
+            DebugLog($"{player.displayName}: Steam playtime unavailable. " +
                      $"Cumulative server time = {totalMinutes:F1} min " +
                      $"(limit: {_config.PrivateProfileMaxMinutes} min). " +
                      $"Kick count = {record.PrivateKickCount}/{_config.KickCountBeforeBan}.");
 
             if (totalMinutes < _config.PrivateProfileMaxMinutes)
             {
+                if (HasPendingKick(player.UserIDString)) return;
+
                 // Still within grace period — warn and schedule kick at time-limit
                 double remaining = _config.PrivateProfileMaxMinutes - totalMinutes;
                 SendMsg(player, GetMsg("PrivateProfile.GraceWarn", player, remaining.ToString("F0")));
@@ -453,6 +641,8 @@ namespace Oxide.Plugins
             }
 
             // Over the cumulative limit
+            if (HasPendingKick(player.UserIDString)) return;
+
             if (record.PrivateKickCount >= _config.KickCountBeforeBan)
             {
                 // Issue BAN
@@ -462,7 +652,7 @@ namespace Oxide.Plugins
 
                 double banHours = _config.BanDurationSeconds / 3600.0;
                 Puts($"[BeginnerGuard] BAN issued to {player.displayName} ({player.UserIDString}) " +
-                     $"for {banHours:F0}h — private profile.");
+                     $"for {banHours:F0}h — Steam playtime unavailable.");
                 KickPlayer(player,
                     GetMsg("PrivateProfile.BanKickReason", player, banHours.ToString("F0")));
             }
@@ -485,6 +675,8 @@ namespace Oxide.Plugins
 
         private void HandleOverLimitPlayer(BasePlayer player, PlayerRecord record, int hours)
         {
+            if (HasPendingKick(player.UserIDString)) return;
+
             SendMsg(player, GetMsg("OverLimit.Warn", player,
                 hours, _config.MaxSteamHours, _config.OverLimitKickDelaySeconds.ToString("F0")));
 
@@ -505,13 +697,18 @@ namespace Oxide.Plugins
         private void ScheduleKick(BasePlayer player, float delaySec, string reason)
         {
             var sid = player.UserIDString;
-            CancelPendingKick(sid);
+            if (HasPendingKick(sid)) return;
             DebugLog($"Kick scheduled for {player.displayName} in {delaySec}s.");
             _pendingKickTimers[sid] = timer.Once(delaySec, () =>
             {
                 _pendingKickTimers.Remove(sid);
-                if (player.IsConnected) KickPlayer(player, reason);
+                if (player.IsConnected && !IsExempt(player)) KickPlayer(player, reason);
             });
+        }
+
+        private bool HasPendingKick(string steamId)
+        {
+            return _pendingKickTimers.ContainsKey(steamId);
         }
 
         private void CancelPendingKick(string steamId)
@@ -522,6 +719,36 @@ namespace Oxide.Plugins
                 _pendingKickTimers.Remove(steamId);
                 DebugLog($"Pending kick cancelled for {steamId}.");
             }
+        }
+
+        private void ScheduleSteamRetry(BasePlayer player)
+        {
+            var sid = player.UserIDString;
+            if (_steamRetryTimers.ContainsKey(sid)) return;
+
+            _steamRetryTimers[sid] = timer.Once(_config.ApiRetryIntervalSeconds, () =>
+            {
+                _steamRetryTimers.Remove(sid);
+                if (player.IsConnected) FetchAndProcessSteamHours(player);
+            });
+        }
+
+        private void CancelSteamRetry(string steamId)
+        {
+            if (!_steamRetryTimers.TryGetValue(steamId, out var retryTimer)) return;
+            retryTimer?.Destroy();
+            _steamRetryTimers.Remove(steamId);
+        }
+
+        private void InvalidateSteamCheck(string steamId)
+        {
+            _steamChecksInFlight.Remove(steamId);
+        }
+
+        private bool HasUsableSteamApiKey()
+        {
+            return !string.IsNullOrWhiteSpace(_config.SteamApiKey) &&
+                   _config.SteamApiKey != "YOUR_STEAM_API_KEY_HERE";
         }
 
         private void MarkDirty()
@@ -545,13 +772,21 @@ namespace Oxide.Plugins
 
             var cutoff   = DateTime.UtcNow.AddDays(-_config.StaleRecordPruneAgeDays);
             var toRemove = new List<string>();
+            int migrated = 0;
 
             foreach (var kv in _data.Players)
             {
                 var r = kv.Value;
                 if (r.LastJoinTime.HasValue)                                    continue; // online now
                 if (r.BannedUntil.HasValue && r.BannedUntil.Value > DateTime.UtcNow) continue; // still banned
-                if (r.LastSeenTicks == 0)                                       continue; // no disconnect recorded yet (migration safety)
+                if (r.LastSeenTicks == 0)
+                {
+                    // Give legacy records one full retention period instead of
+                    // exempting them from pruning forever.
+                    r.LastSeen = DateTime.UtcNow;
+                    migrated++;
+                    continue;
+                }
                 if (r.LastSeen > cutoff)                                        continue; // seen recently
                 toRemove.Add(kv.Key);
             }
@@ -559,10 +794,13 @@ namespace Oxide.Plugins
             foreach (var sid in toRemove)
                 _data.Players.Remove(sid);
 
-            if (toRemove.Count > 0)
+            if (toRemove.Count > 0 || migrated > 0)
             {
-                Puts($"[BeginnerGuard] Pruned {toRemove.Count} stale record(s) older than {_config.StaleRecordPruneAgeDays} days.");
                 SaveData();
+                if (toRemove.Count > 0)
+                    Puts($"[BeginnerGuard] Pruned {toRemove.Count} stale record(s) older than {_config.StaleRecordPruneAgeDays} days.");
+                if (migrated > 0)
+                    Puts($"[BeginnerGuard] Initialised last-seen timestamps for {migrated} legacy record(s).");
             }
             else
             {
@@ -640,7 +878,7 @@ namespace Oxide.Plugins
                 arg.ReplyWith(
                     $"=== {r.DisplayName} ({r.SteamId}) ===\n" +
                     $"Steam Rust hours    : {r.SteamTotalHours}h\n" +
-                    $"Profile private     : {r.IsProfilePrivate}\n" +
+                    $"Playtime unavailable: {r.IsProfilePrivate}\n" +
                     $"Server playtime     : {r.ServerPlaytimeMinutes:F1} min\n" +
                     $"Kick count          : {r.PrivateKickCount} / {_config.KickCountBeforeBan}\n" +
                     $"Banned until (UTC)  : {banStr}\n" +
@@ -693,6 +931,16 @@ namespace Oxide.Plugins
                 arg.ReplyWith($"{sid} is not currently online.");
                 return;
             }
+            if (IsExempt(player))
+            {
+                arg.ReplyWith($"{player.displayName} is exempt from BeginnerGuard checks.");
+                return;
+            }
+            if (!HasUsableSteamApiKey())
+            {
+                arg.ReplyWith("[BeginnerGuard] Steam API key is not configured.");
+                return;
+            }
             FetchAndProcessSteamHours(player);
             arg.ReplyWith($"[BeginnerGuard] Forced Steam check started for {player.displayName}.");
         }
@@ -706,16 +954,28 @@ namespace Oxide.Plugins
 
             if (_data.Players.TryGetValue(sid, out var r))
             {
-                r.ServerPlaytimeMinutes = 0;
-                r.PrivateKickCount      = 0;
-                r.BannedUntil           = null;
-                r.LastJoinTime          = null;
-                r.IsProfilePrivate      = false;
-                r.SteamTotalHours       = -1;
-                r.LastSteamCheck        = DateTime.MinValue;
+                string displayName = r.DisplayName;
+                CancelPendingKick(sid);
+                CancelSteamRetry(sid);
+                InvalidateSteamCheck(sid);
+                _data.Players.Remove(sid);
+
+                BasePlayer onlinePlayer = null;
+                if (ulong.TryParse(sid, out var uid))
+                    onlinePlayer = BasePlayer.FindByID(uid);
+
+                if (onlinePlayer != null && onlinePlayer.IsConnected)
+                {
+                    var freshRecord = GetOrCreateRecord(onlinePlayer);
+                    freshRecord.LastJoinTime = DateTime.UtcNow;
+                }
+
                 SaveData();
-                arg.ReplyWith($"[BeginnerGuard] Record reset for {r.DisplayName} ({sid}).");
-                Puts($"[BeginnerGuard] Record manually reset for {r.DisplayName} ({sid}).");
+                arg.ReplyWith($"[BeginnerGuard] Record reset for {displayName} ({sid}).");
+                Puts($"[BeginnerGuard] Record manually reset for {displayName} ({sid}).");
+
+                if (onlinePlayer != null && onlinePlayer.IsConnected)
+                    FetchAndProcessSteamHours(onlinePlayer);
             }
             else
             {

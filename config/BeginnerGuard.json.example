@@ -9,5 +9,8 @@
   "Private profile: max warning kicks before BAN": 2,
   "BAN duration (seconds)": 86400.0,
   "Skip checks for Oxide admins": true,
-  "Enable debug logging": false
+  "Enable debug logging": false,
+  "Deferred data save (true = periodic timer, false = save on every change)": false,
+  "Data save interval (seconds) — used only when Deferred data save is true": 300.0,
+  "Stale record prune age (days, 0 = disabled)": 90
 }

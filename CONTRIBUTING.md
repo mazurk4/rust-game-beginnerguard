@@ -8,6 +8,15 @@ Contributions are welcome! Please read these guidelines before opening a PR.
 - For large changes, open an issue first to discuss the approach before writing code.
 - **Always work on a dedicated branch** — never commit directly to `main`.
 
+## Credential Safety
+
+This repository is public. Never commit Steam API keys, RCON passwords, server tokens, webhook URLs, private keys, or other credentials.
+
+- Keep only placeholders in tracked example configuration files.
+- Store real values only in the server's untracked runtime configuration.
+- Review `git diff --cached` before committing.
+- Revoke and rotate any credential that is accidentally added to Git history; deleting it in a later commit is not sufficient.
+
 ## Pull Request Guidelines
 
 1. **Test your changes** on a local Rust server before submitting.
