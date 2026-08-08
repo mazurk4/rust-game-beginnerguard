@@ -26,6 +26,7 @@ Everything is configurable — playtime cap, grace period, kick delays, BAN dura
 - Automatic BAN expiry — no manual cleanup needed
 - `beginnerguard.exempt` permission to whitelist VIPs and trusted players
 - Periodic re-check of all online players
+- `/bgstatus` player self-check using the latest cached Steam decision without an additional API request
 - Orange colored chat warnings (`#FFA500`) for easy visibility
 - Multi-language — English and Japanese built-in; add more via `oxide/lang/`
 - Discord Webhook notifications with independent switches for grace, kick, BAN, reconnect, expiry, and manual unban events
@@ -72,16 +73,25 @@ Players must make Steam **Game details** public and make total playtime visible.
 
 - `beginnerguard.exempt` — Skip all checks — for VIPs and trusted regulars
 - `beginnerguard.admin` — Use `bg.*` commands from the in-game F1 console
+- `beginnerguard.status` — Use `/bgstatus` and `/bgstatus steam` in chat
 
 ```
 oxide.grant group  <group>      beginnerguard.exempt
 oxide.grant group  <group>      beginnerguard.admin
 oxide.grant user   <SteamID64>  beginnerguard.exempt
+oxide.grant group  default      beginnerguard.status
+oxide.grant user   <SteamID64>  beginnerguard.status
 ```
+
+Grant the permission to the `default` group for all players, or grant it only to selected SteamID64 users. Use the corresponding `oxide.revoke` command to remove access.
 
 ---
 
 ## Commands
+
+Players with `beginnerguard.status` can use `/bgstatus` in chat to see their own latest cached Steam visibility and playtime decision. When visibility cannot be verified, the result directs them to `/bgstatus steam`, which displays the Steam privacy setup instructions. Neither command makes a Steam API request.
+
+### Administration commands
 
 All commands work from the **server console / RCON** without permissions.  
 Requires `beginnerguard.admin` when used from the **in-game F1 console**.

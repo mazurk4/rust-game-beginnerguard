@@ -60,6 +60,7 @@ Players are also **periodically re-checked** while they are online.
 - **Automatic BAN expiry** — bans lift themselves; no admin action needed
 - **Exempt permission** — whitelist VIPs, staff, and trusted players
 - **Periodic re-check** — re-validates all online players on a schedule
+- **Player self-check** — `/bgstatus` shows the player's latest cached Steam eligibility result without making another API request
 - **Colored chat warnings** — orange `#FFA500` for easy visibility
 - **Multi-language** — English and Japanese built-in; add more via `oxide/lang/`
 - **Configurable save mode** — immediate save (default) or deferred periodic save to reduce disk IO on high-population servers
@@ -138,16 +139,30 @@ For Steam playtime to be available, the player must make Steam **Game details** 
 |------------|--------|
 | `beginnerguard.exempt` | Skip all checks — for VIPs and trusted players |
 | `beginnerguard.admin` | Use `bg.*` commands from the in-game F1 console |
+| `beginnerguard.status` | Use `/bgstatus` and `/bgstatus steam` in chat |
 
 ```
 oxide.grant group  <group>      beginnerguard.exempt
 oxide.grant group  <group>      beginnerguard.admin
 oxide.grant user   <SteamID64>  beginnerguard.exempt
+oxide.grant group  default      beginnerguard.status
+oxide.grant user   <SteamID64>  beginnerguard.status
 ```
+
+Grant `beginnerguard.status` to the `default` group to enable the command for every player, or grant it to individual SteamID64 users only. Revoke it with `oxide.revoke group default beginnerguard.status` or the corresponding `oxide.revoke user` command.
 
 ---
 
 ## Commands
+
+Players with `beginnerguard.status` can use these chat commands. Neither command sends a Steam API request, so they can be used repeatedly without affecting API limits.
+
+| Chat command | Description |
+|--------------|-------------|
+| `/bgstatus` | Show the player's latest cached Steam visibility and playtime decision. If visibility cannot be verified, the result points to `/bgstatus steam`. |
+| `/bgstatus steam` | Show instructions for making Steam game details and total playtime public. |
+
+### Administration commands
 
 Available from the **server console / RCON** without any permissions.  
 Requires `beginnerguard.admin` when used from the **in-game F1 console**.
