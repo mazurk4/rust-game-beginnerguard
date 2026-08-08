@@ -58,6 +58,7 @@
 - **BAN 自動解除** — 時間が来ると自動解除。手動作業不要
 - **免除パーミッション** — VIP・スタッフ・信頼済みプレイヤーをチェック対象外にできる
 - **定期再チェック** — 設定間隔でオンライン全プレイヤーを再検証
+- **プレイヤー自身による確認** — `/bgstatus` で、Steam APIへ追加リクエストせずに最新の保存済み参加判定を確認可能
 - **色付きチャット警告** — オレンジ色（`#FFA500`）で見やすく表示
 - **多言語対応** — 英語・日本語標準搭載。`oxide/lang/` に追加するだけで他言語も対応可能
 - **保存モード切り替え** — 即時保存（デフォルト）と定期保存（遅延書き込み）を設定で選択可能。大規模サーバーのディスク IO 削減に有効
@@ -136,16 +137,30 @@ Steam APIから時間を取得するには、プレイヤー側でSteamの「ゲ
 |----------------|------|
 | `beginnerguard.exempt` | 全チェックをスキップ（VIP・スタッフ向け） |
 | `beginnerguard.admin` | ゲーム内 F1 コンソールから `bg.*` コマンドを使用可能 |
+| `beginnerguard.status` | チャットで `/bgstatus` と `/bgstatus steam` を使用可能 |
 
 ```
 oxide.grant group  <グループ名>  beginnerguard.exempt
 oxide.grant group  <グループ名>  beginnerguard.admin
 oxide.grant user   <SteamID64>  beginnerguard.exempt
+oxide.grant group  default      beginnerguard.status
+oxide.grant user   <SteamID64>  beginnerguard.status
 ```
+
+全プレイヤーに許可する場合は、`default` グループへ `beginnerguard.status` を付与します。特定プレイヤーだけに許可する場合は、SteamID64を指定して個別に付与してください。取り消す場合は `oxide.revoke group default beginnerguard.status` または対応する `oxide.revoke user` コマンドを使用します。
 
 ---
 
-## コンソールコマンド
+## コマンド
+
+`beginnerguard.status` を持つプレイヤーは、次のチャットコマンドを使用できます。どちらもSteam APIへリクエストしないため、繰り返し実行してもAPI制限に影響しません。
+
+| チャットコマンド | 説明 |
+|------------------|------|
+| `/bgstatus` | 自分のSteam公開状態とプレイ時間に対する最新の保存済み判定を表示。非公開・確認不能の場合は `/bgstatus steam` を案内します。 |
+| `/bgstatus steam` | Steamのゲーム詳細と総プレイ時間を公開する手順を表示します。 |
+
+### 管理コマンド
 
 **サーバーコンソール / RCON** からはパーミッションなしで使用できます。  
 **ゲーム内 F1 コンソール**から使用するには `beginnerguard.admin` が必要です。

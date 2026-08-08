@@ -71,6 +71,11 @@ namespace Oxide.Plugins
         public ConsoleCommandAttribute(string command) { }
     }
 
+    public sealed class ChatCommandAttribute : Attribute
+    {
+        public ChatCommandAttribute(string command) { }
+    }
+
     public class RustPlugin
     {
         protected Permission permission = new Permission();

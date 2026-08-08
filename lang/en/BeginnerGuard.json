@@ -7,5 +7,12 @@
   "PrivateProfile.EscalatedBanKickReason": "[BeginnerGuard] Your BAN has been extended to {0} hour(s).\nYour Steam playtime was still unavailable after the previous BAN expired.\nSteam → Profile → Edit Profile → Privacy Settings → Game details: Public; uncheck 'Always keep my total playtime private even if users can see my game details'.",
   "PrivateProfile.BanConnectKick": "[BeginnerGuard] You are banned. Ban expires in: {0}h {1}m\nBefore reconnecting, set Steam Game details to Public and uncheck 'Always keep my total playtime private even if users can see my game details'.",
   "OverLimit.Warn": "<color=#FFA500>[BeginnerGuard] This is a beginner-only server.\nYour Rust playtime on Steam: {0}h (limit: {1}h).\nYou will be kicked in {2}s. Please find a server that matches your experience level.</color>",
-  "OverLimit.KickReason": "[BeginnerGuard] Kicked: playtime too high ({0}h / limit {1}h).\nThis server is for beginners only. Thanks for understanding!"
+  "OverLimit.KickReason": "[BeginnerGuard] Kicked: playtime too high ({0}h / limit {1}h).\nThis server is for beginners only. Thanks for understanding!",
+  "Status.Exempt": "[BeginnerGuard] You are exempt from BeginnerGuard checks. Your Steam settings are not evaluated.",
+  "Status.NotChecked": "[BeginnerGuard] Your Steam status has not been checked yet. Please wait for the automatic check and try /bgstatus again.",
+  "Status.NoPermission": "[BeginnerGuard] You do not have permission to use /bgstatus.",
+  "Status.Unavailable": "[BeginnerGuard] Steam check: ACTION REQUIRED\nYour game details or total playtime could not be verified.\nLast checked: {0} UTC\nRun /bgstatus steam to see how to make your Steam playtime public.",
+  "Status.OverLimit": "[BeginnerGuard] Steam check: NOT ELIGIBLE\nYour game details are visible, but your Rust playtime is {0}h (limit: {1}h).\nLast checked: {2} UTC",
+  "Status.Allowed": "[BeginnerGuard] Steam check: OK\nYour game details and Rust playtime are visible. Playtime: {0}h (limit: {1}h).\nLast checked: {2} UTC",
+  "Status.SteamGuide": "[BeginnerGuard] How to make your Steam playtime public:\n1. Steam → Profile → Edit Profile → Privacy Settings\n2. Set 'Game details' to Public\n3. Uncheck 'Always keep my total playtime private even if users can see my game details'\n4. Wait for the next automatic check, then run /bgstatus again."
 }

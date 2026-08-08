@@ -5,7 +5,7 @@ using Oxide.Core;
 
 namespace Oxide.Plugins
 {
-    [Info("Beginner Guard", "Mazurk4_", "1.6.2")]
+    [Info("Beginner Guard", "Mazurk4_", "1.7.0")]
     [Description("Beginner server protection - restricts players by Rust Steam playtime")]
     public class BeginnerGuard : RustPlugin
     {
@@ -14,6 +14,7 @@ namespace Oxide.Plugins
         //
         //  beginnerguard.exempt  - Skip all checks (whitelist equivalent)
         //  beginnerguard.admin   - Use management console commands
+        //  beginnerguard.status  - Use the /bgstatus chat command
         //
         // Grant to a group:  oxide.grant group <group> beginnerguard.exempt
         // Grant to a user:   oxide.grant user  <sid>   beginnerguard.admin
@@ -21,6 +22,7 @@ namespace Oxide.Plugins
         // ---------------------------------------------------------------
         private const string PermExempt = "beginnerguard.exempt";
         private const string PermAdmin  = "beginnerguard.admin";
+        private const string PermStatus = "beginnerguard.status";
         private const int RustAppId = 252490;
 
         // ---------------------------------------------------------------
@@ -237,6 +239,13 @@ namespace Oxide.Plugins
                 ["PrivateProfile.BanConnectKick"]  = "[BeginnerGuard] You are banned. Ban expires in: {0}h {1}m\nBefore reconnecting, set Steam Game details to Public and uncheck 'Always keep my total playtime private even if users can see my game details'.",
                 ["OverLimit.Warn"]                 = "<color=#FFA500>[BeginnerGuard] This is a beginner-only server.\nYour Rust playtime on Steam: {0}h (limit: {1}h).\nYou will be kicked in {2}s. Please find a server that matches your experience level.</color>",
                 ["OverLimit.KickReason"]           = "[BeginnerGuard] Kicked: playtime too high ({0}h / limit {1}h).\nThis server is for beginners only. Thanks for understanding!",
+                ["Status.Exempt"]                  = "[BeginnerGuard] You are exempt from BeginnerGuard checks. Your Steam settings are not evaluated.",
+                ["Status.NotChecked"]              = "[BeginnerGuard] Your Steam status has not been checked yet. Please wait for the automatic check and try /bgstatus again.",
+                ["Status.NoPermission"]            = "[BeginnerGuard] You do not have permission to use /bgstatus.",
+                ["Status.Unavailable"]             = "[BeginnerGuard] Steam check: ACTION REQUIRED\nYour game details or total playtime could not be verified.\nLast checked: {0} UTC\nRun /bgstatus steam to see how to make your Steam playtime public.",
+                ["Status.OverLimit"]               = "[BeginnerGuard] Steam check: NOT ELIGIBLE\nYour game details are visible, but your Rust playtime is {0}h (limit: {1}h).\nLast checked: {2} UTC",
+                ["Status.Allowed"]                 = "[BeginnerGuard] Steam check: OK\nYour game details and Rust playtime are visible. Playtime: {0}h (limit: {1}h).\nLast checked: {2} UTC",
+                ["Status.SteamGuide"]              = "[BeginnerGuard] How to make your Steam playtime public:\n1. Steam → Profile → Edit Profile → Privacy Settings\n2. Set 'Game details' to Public\n3. Uncheck 'Always keep my total playtime private even if users can see my game details'\n4. Wait for the next automatic check, then run /bgstatus again.",
             }, this);
 
             // Japanese
@@ -251,6 +260,13 @@ namespace Oxide.Plugins
                 ["PrivateProfile.BanConnectKick"]  = "[BeginnerGuard] BANされています。解除まで: {0}時間{1}分\n再接続前にSteamの「ゲームの詳細」を公開し、「ゲームの詳細が公開中でも総プレイ時間を常に非公開にする」のチェックを外してください。",
                 ["OverLimit.Warn"]                 = "<color=#FFA500>[BeginnerGuard] このサーバーは初心者専用です。\nあなたのRust Steamプレイ時間: {0}時間（上限: {1}時間）\n{2}秒後にキックされます。ご自身の経験に合ったサーバーをお探しください。</color>",
                 ["OverLimit.KickReason"]           = "[BeginnerGuard] キック: プレイ時間が超過しています（{0}時間 / 上限 {1}時間）\nこのサーバーは初心者専用です。ご理解ありがとうございます！",
+                ["Status.Exempt"]                  = "[BeginnerGuard] あなたはBeginnerGuardのチェック免除対象です。Steam設定は判定されません。",
+                ["Status.NotChecked"]              = "[BeginnerGuard] Steam状態はまだ確認されていません。自動チェックを待ってから、もう一度 /bgstatus を実行してください。",
+                ["Status.NoPermission"]            = "[BeginnerGuard] /bgstatus を使用する権限がありません。",
+                ["Status.Unavailable"]             = "[BeginnerGuard] Steamチェック: 設定の確認が必要です\nゲーム詳細または総プレイ時間を確認できませんでした。\n最終確認: {0} UTC\nSteam公開設定の方法は /bgstatus steam で確認できます。",
+                ["Status.OverLimit"]               = "[BeginnerGuard] Steamチェック: 参加条件を満たしていません\nゲーム詳細は公開されていますが、Rustプレイ時間が{0}時間です（上限: {1}時間）。\n最終確認: {2} UTC",
+                ["Status.Allowed"]                 = "[BeginnerGuard] Steamチェック: 正常です\nゲーム詳細とRustプレイ時間を確認できました。プレイ時間: {0}時間（上限: {1}時間）\n最終確認: {2} UTC",
+                ["Status.SteamGuide"]              = "[BeginnerGuard] Steamプレイ時間の公開設定方法:\n1. Steam → プロフィール → プロフィールを編集 → プライバシー設定\n2.「ゲームの詳細」を「公開」に設定\n3.「ゲームの詳細が公開中でも総プレイ時間を常に非公開にする」のチェックを外す\n4. 次回の自動チェック後に、もう一度 /bgstatus を実行してください。",
             }, this, "ja");
         }
 
@@ -269,6 +285,7 @@ namespace Oxide.Plugins
             public string SteamId               { get; set; } = string.Empty;
             public string DisplayName           { get; set; } = string.Empty;
             public int    SteamTotalHours       { get; set; } = -1;     // -1 = not yet fetched
+            public int    SteamTotalMinutes     { get; set; } = -1;     // exact value for eligibility checks
             public bool   IsProfilePrivate      { get; set; } = false;
             public double ServerPlaytimeMinutes { get; set; } = 0.0;    // cumulative on this server
             // LastJoinTime stored as UTC ticks (long) to avoid DateTime? JSON issues
@@ -407,11 +424,13 @@ namespace Oxide.Plugins
         {
             permission.RegisterPermission(PermExempt, this);
             permission.RegisterPermission(PermAdmin,  this);
+            permission.RegisterPermission(PermStatus, this);
             LoadData();
 
             Puts("BeginnerGuard initialised.");
             Puts($"  Exempt permission : {PermExempt}");
             Puts($"  Admin permission  : {PermAdmin}");
+            Puts($"  Status permission : {PermStatus}");
             Puts($"  Debug logging     : {(_config.DebugLogging ? "ON" : "OFF")}");
 
             if (!HasUsableSteamApiKey())
@@ -708,6 +727,7 @@ namespace Oxide.Plugins
                     int hours = minutesPlayed / 60;
                     bool overLimit = minutesPlayed > _config.MaxSteamHours * 60L;
                     record.SteamTotalHours  = hours;
+                    record.SteamTotalMinutes = minutesPlayed;
                     record.IsProfilePrivate = false;
                     record.LastSteamCheck   = DateTime.UtcNow;
                     // Publishing playtime completes any private-profile BAN cycle.
@@ -1096,6 +1116,59 @@ namespace Oxide.Plugins
             if (player.IsConnected) player.ChatMessage(msg);
         }
 
+        [ChatCommand("bgstatus")]
+        private void CmdPlayerStatus(BasePlayer player, string command, string[] args)
+        {
+            if (!permission.UserHasPermission(player.UserIDString, PermStatus))
+            {
+                SendMsg(player, GetMsg("Status.NoPermission", player));
+                return;
+            }
+
+            if (args.Length > 0 && args[0].Equals("steam", StringComparison.OrdinalIgnoreCase))
+            {
+                SendMsg(player, GetMsg("Status.SteamGuide", player));
+                return;
+            }
+
+            if (IsExempt(player))
+            {
+                SendMsg(player, GetMsg("Status.Exempt", player));
+                return;
+            }
+
+            if (!_data.Players.TryGetValue(player.UserIDString, out var record) ||
+                record.LastSteamCheck == DateTime.MinValue)
+            {
+                SendMsg(player, GetMsg("Status.NotChecked", player));
+                return;
+            }
+
+            string checkedAt = record.LastSteamCheck.ToString("yyyy-MM-dd HH:mm:ss");
+            if (record.IsProfilePrivate)
+            {
+                SendMsg(player, GetMsg("Status.Unavailable", player, checkedAt));
+                return;
+            }
+
+            bool overLimit = record.SteamTotalMinutes >= 0
+                ? record.SteamTotalMinutes > _config.MaxSteamHours * 60L
+                : record.SteamTotalHours > _config.MaxSteamHours;
+            string displayedHours = record.SteamTotalMinutes >= 0
+                ? (record.SteamTotalMinutes / 60.0).ToString("0.#")
+                : record.SteamTotalHours.ToString();
+
+            if (overLimit)
+            {
+                SendMsg(player, GetMsg("Status.OverLimit", player,
+                    displayedHours, _config.MaxSteamHours, checkedAt));
+                return;
+            }
+
+            SendMsg(player, GetMsg("Status.Allowed", player,
+                displayedHours, _config.MaxSteamHours, checkedAt));
+        }
+
         private string GetMsg(string key, BasePlayer player, params object[] args)
         {
             string msg = lang.GetMessage(key, this, player?.UserIDString);
@@ -1133,6 +1206,7 @@ namespace Oxide.Plugins
                 "=== Permission Management ===\n" +
                 $"  oxide.grant  group <group> {PermAdmin}   -- grant admin commands\n" +
                 $"  oxide.grant  group <group> {PermExempt}  -- grant check exemption\n" +
+                $"  oxide.grant  group <group> {PermStatus}  -- grant /bgstatus\n" +
                 $"  oxide.grant  user  <sid>   {PermAdmin}   -- per-user grant\n" +
                 $"  oxide.revoke group <group> {PermAdmin}   -- revoke");
         }
