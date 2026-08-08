@@ -5,7 +5,7 @@ using Oxide.Core;
 
 namespace Oxide.Plugins
 {
-    [Info("Beginner Guard", "Mazurk4_", "1.6.1")]
+    [Info("Beginner Guard", "Mazurk4_", "1.6.2")]
     [Description("Beginner server protection - restricts players by Rust Steam playtime")]
     public class BeginnerGuard : RustPlugin
     {
@@ -379,8 +379,21 @@ namespace Oxide.Plugins
         private Timer _periodicCheckTimer;
         private Timer _dataSaveTimer;
         private bool  _dataDirty = false;
-        private readonly Dictionary<string, Timer> _pendingKickTimers
-            = new Dictionary<string, Timer>();
+        private enum PendingKickType
+        {
+            PrivateProfileGrace,
+            PrivateProfileWarning,
+            OverLimit
+        }
+
+        private class PendingKick
+        {
+            public Timer Timer { get; set; }
+            public PendingKickType Type { get; set; }
+        }
+
+        private readonly Dictionary<string, PendingKick> _pendingKickTimers
+            = new Dictionary<string, PendingKick>();
         private readonly Dictionary<string, Timer> _steamRetryTimers
             = new Dictionary<string, Timer>();
         private readonly Dictionary<string, long> _steamChecksInFlight
@@ -442,7 +455,7 @@ namespace Oxide.Plugins
             SnapshotActiveSessions();
             _periodicCheckTimer?.Destroy();
             _dataSaveTimer?.Destroy();
-            foreach (var t in _pendingKickTimers.Values) t?.Destroy();
+            foreach (var pending in _pendingKickTimers.Values) pending?.Timer?.Destroy();
             foreach (var t in _steamRetryTimers.Values) t?.Destroy();
             _pendingKickTimers.Clear();
             _steamRetryTimers.Clear();
@@ -786,6 +799,7 @@ namespace Oxide.Plugins
                     $"Grace remaining: {remaining:F0} min");
 
                 ScheduleKick(player, (float)(remaining * 60f),
+                    PendingKickType.PrivateProfileGrace,
                     GetMsg("PrivateProfile.GraceKickReason", player),
                     () => NotifyDiscord(_config.DiscordWebhook.NotifyGraceExpired,
                         "Private-profile grace period expired", player,
@@ -814,6 +828,7 @@ namespace Oxide.Plugins
                     (_config.BanDurationSeconds / 3600).ToString("F0")));
 
                 ScheduleKick(player, _config.PrivateProfileKickDelaySeconds,
+                    PendingKickType.PrivateProfileWarning,
                     GetMsg("PrivateProfile.WarnKickReason", player),
                     () => NotifyDiscord(_config.DiscordWebhook.NotifyWarningKick,
                         "Private-profile warning kick", player,
@@ -847,12 +862,25 @@ namespace Oxide.Plugins
 
         private void HandleOverLimitPlayer(BasePlayer player, PlayerRecord record, int hours)
         {
-            if (HasPendingKick(player.UserIDString)) return;
+            var sid = player.UserIDString;
+            if (HasPendingKick(sid, PendingKickType.OverLimit))
+            {
+                DebugLog($"Over-limit kick is already scheduled for {player.displayName} ({sid}).");
+                return;
+            }
+
+            if (HasPendingKick(sid))
+            {
+                DebugLog($"Replacing pending private-profile kick with over-limit kick for " +
+                         $"{player.displayName} ({sid}).");
+                CancelPendingKick(sid);
+            }
 
             SendMsg(player, GetMsg("OverLimit.Warn", player,
                 hours, _config.MaxSteamHours, _config.OverLimitKickDelaySeconds.ToString("F0")));
 
             ScheduleKick(player, _config.OverLimitKickDelaySeconds,
+                PendingKickType.OverLimit,
                 GetMsg("OverLimit.KickReason", player, hours, _config.MaxSteamHours),
                 () => NotifyDiscord(_config.DiscordWebhook.NotifyOverLimitKick,
                     "Steam playtime limit exceeded", player,
@@ -869,13 +897,13 @@ namespace Oxide.Plugins
             return false;
         }
 
-        private void ScheduleKick(BasePlayer player, float delaySec, string reason,
-            Action beforeKick = null)
+        private void ScheduleKick(BasePlayer player, float delaySec, PendingKickType type,
+            string reason, Action beforeKick = null)
         {
             var sid = player.UserIDString;
             if (HasPendingKick(sid)) return;
-            DebugLog($"Kick scheduled for {player.displayName} in {delaySec}s.");
-            _pendingKickTimers[sid] = timer.Once(delaySec, () =>
+            DebugLog($"{type} kick scheduled for {player.displayName} in {delaySec}s.");
+            var kickTimer = timer.Once(delaySec, () =>
             {
                 _pendingKickTimers.Remove(sid);
                 if (player.IsConnected && !IsExempt(player))
@@ -884,6 +912,11 @@ namespace Oxide.Plugins
                     KickPlayer(player, reason);
                 }
             });
+            _pendingKickTimers[sid] = new PendingKick
+            {
+                Timer = kickTimer,
+                Type = type
+            };
         }
 
         private bool HasPendingKick(string steamId)
@@ -891,11 +924,17 @@ namespace Oxide.Plugins
             return _pendingKickTimers.ContainsKey(steamId);
         }
 
+        private bool HasPendingKick(string steamId, PendingKickType type)
+        {
+            return _pendingKickTimers.TryGetValue(steamId, out var pending) &&
+                   pending.Type == type;
+        }
+
         private void CancelPendingKick(string steamId)
         {
-            if (_pendingKickTimers.TryGetValue(steamId, out var t))
+            if (_pendingKickTimers.TryGetValue(steamId, out var pending))
             {
-                t?.Destroy();
+                pending?.Timer?.Destroy();
                 _pendingKickTimers.Remove(steamId);
                 DebugLog($"Pending kick cancelled for {steamId}.");
             }
