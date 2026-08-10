@@ -3,7 +3,7 @@
 An [Oxide/uMod](https://umod.org/) plugin for [Rust](https://store.steampowered.com/app/252490/Rust/) that keeps beginner servers beginner-friendly.  
 It checks each player's Steam Rust playtime on connect and removes anyone who has outgrown your server's skill level.
 
-**Version:** 1.6.1 | **Author:** Mazurk4_ | **License:** [MIT](LICENSE)
+**Version:** 1.8.0 | **Author:** Mazurk4_ | **License:** [MIT](LICENSE)
 
 [日本語版 README はこちら](README-JPN.md)
 
@@ -170,12 +170,19 @@ Requires `beginnerguard.admin` when used from the **in-game F1 console**.
 | Command | Description |
 |---------|-------------|
 | `bg.help` | Show command list |
+| `bg.list [page]` | List managed players (20 records per page) |
+| `bg.list online [page]` | List managed players who are currently online |
+| `bg.banlist [page]` | List active BeginnerGuard BANs |
 | `bg.check <SteamID64>` | Display a player's stored record |
 | `bg.unban <SteamID64>` | Lift an active BAN |
 | `bg.forcecheck <SteamID64>` | Trigger an immediate Steam API check (player must be online) |
 | `bg.reset <SteamID64>` | Wipe all stored data for a player |
 | `bg.prune` | Immediately remove stale records older than the configured prune age |
 | `bg.debug <on\|off>` | Toggle debug logging without restarting |
+
+List output includes online state, management decision (`ALLOWED`, `OVER_LIMIT`,
+`UNAVAILABLE`, `UNCHECKED`, or `BANNED`), name, SteamID64, Steam playtime,
+cumulative server time including the current session, warning count, and BAN expiry in UTC.
 
 ### Re-evaluation after `bg.unban`
 

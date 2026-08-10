@@ -3,7 +3,7 @@
 [Oxide/uMod](https://umod.org/) 向け [Rust](https://store.steampowered.com/app/252490/Rust/) プラグインです。  
 接続してきたプレイヤーの Steam Rust プレイ時間を自動確認し、初心者サーバーを守ります。
 
-**バージョン:** 1.6.1 | **作者:** Mazurk4_ | **ライセンス:** [MIT](LICENSE)
+**バージョン:** 1.8.0 | **作者:** Mazurk4_ | **ライセンス:** [MIT](LICENSE)
 
 ---
 
@@ -168,12 +168,19 @@ oxide.grant user   <SteamID64>  beginnerguard.status
 | コマンド | 説明 |
 |---------|------|
 | `bg.help` | コマンド一覧を表示 |
+| `bg.list [ページ]` | 管理対象プレイヤーを一覧表示（1ページ20件） |
+| `bg.list online [ページ]` | 現在オンラインの管理対象プレイヤーを一覧表示 |
+| `bg.banlist [ページ]` | BeginnerGuardによる有効なBANを一覧表示 |
 | `bg.check <SteamID64>` | プレイヤーの保存データを表示 |
 | `bg.unban <SteamID64>` | アクティブな BAN を解除 |
 | `bg.forcecheck <SteamID64>` | Steam API チェックを即時実行（オンライン中のみ） |
 | `bg.reset <SteamID64>` | プレイヤーの保存データを全リセット |
 | `bg.prune` | 設定の保持日数を超えた古いレコードを即時削除 |
 | `bg.debug <on\|off>` | リロードなしでデバッグログのオン/オフ切替 |
+
+一覧にはオンライン状態、判定状態（`ALLOWED` / `OVER_LIMIT` / `UNAVAILABLE` /
+`UNCHECKED` / `BANNED`）、名前、SteamID64、Steamプレイ時間、現在のセッションを
+含むサーバー累積滞在時間、警告回数、BAN期限（UTC）が表示されます。
 
 ### `bg.unban` 後の再判定
 

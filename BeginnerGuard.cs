@@ -5,7 +5,7 @@ using Oxide.Core;
 
 namespace Oxide.Plugins
 {
-    [Info("Beginner Guard", "Mazurk4_", "1.7.0")]
+    [Info("Beginner Guard", "Mazurk4_", "1.8.0")]
     [Description("Beginner server protection - restricts players by Rust Steam playtime")]
     public class BeginnerGuard : RustPlugin
     {
@@ -24,6 +24,7 @@ namespace Oxide.Plugins
         private const string PermAdmin  = "beginnerguard.admin";
         private const string PermStatus = "beginnerguard.status";
         private const int RustAppId = 252490;
+        private const int ListPageSize = 20;
 
         // ---------------------------------------------------------------
         // Configuration
@@ -354,6 +355,11 @@ namespace Oxide.Plugins
                 var loaded = Interface.Oxide.DataFileSystem.ReadObject<StoredData>(DataFileName);
                 _data = loaded ?? new StoredData();
                 if (_data.Players == null) _data.Players = new Dictionary<string, PlayerRecord>();
+                foreach (var entry in _data.Players)
+                {
+                    if (entry.Value != null && string.IsNullOrEmpty(entry.Value.SteamId))
+                        entry.Value.SteamId = entry.Key;
+                }
                 DebugLog($"Data loaded — {_data.Players.Count} player record(s).");
             }
             catch (Exception ex)
@@ -1195,6 +1201,8 @@ namespace Oxide.Plugins
             if (!HasAdminPerm(arg)) return;
             arg.ReplyWith(
                 "=== BeginnerGuard Commands ===\n" +
+                "bg.list       [online] [page]  List managed players (20 per page)\n" +
+                "bg.banlist    [page]           List players with an active BAN\n" +
                 "bg.check      <SteamID64>  Show player record\n" +
                 "bg.unban      <SteamID64>  Lift an active BAN\n" +
                 "bg.forcecheck <SteamID64>  Force an immediate Steam API check (player must be online)\n" +
@@ -1209,6 +1217,158 @@ namespace Oxide.Plugins
                 $"  oxide.grant  group <group> {PermStatus}  -- grant /bgstatus\n" +
                 $"  oxide.grant  user  <sid>   {PermAdmin}   -- per-user grant\n" +
                 $"  oxide.revoke group <group> {PermAdmin}   -- revoke");
+        }
+
+        [ConsoleCommand("bg.list")]
+        private void CmdList(ConsoleSystem.Arg arg)
+        {
+            if (!HasAdminPerm(arg)) return;
+
+            string first = arg.GetString(0);
+            bool onlineOnly = first.Equals("online", StringComparison.OrdinalIgnoreCase);
+            int page;
+            string pageArg = onlineOnly ? arg.GetString(1) : first;
+            if (!TryParsePage(pageArg, out page))
+            {
+                arg.ReplyWith("Usage: bg.list [online] [page]");
+                return;
+            }
+
+            var onlineIds = GetOnlinePlayerIds();
+            var records = new List<PlayerRecord>();
+            foreach (var entry in _data.Players)
+            {
+                if (onlineOnly && !onlineIds.Contains(entry.Key)) continue;
+                records.Add(entry.Value);
+            }
+
+            records.Sort((a, b) => string.Compare(
+                a.DisplayName ?? string.Empty, b.DisplayName ?? string.Empty,
+                StringComparison.OrdinalIgnoreCase));
+            ReplyWithPlayerList(arg, records, page,
+                onlineOnly ? "Online managed players" : "Managed players", onlineIds);
+        }
+
+        [ConsoleCommand("bg.banlist")]
+        private void CmdBanList(ConsoleSystem.Arg arg)
+        {
+            if (!HasAdminPerm(arg)) return;
+
+            int page;
+            if (!TryParsePage(arg.GetString(0), out page))
+            {
+                arg.ReplyWith("Usage: bg.banlist [page]");
+                return;
+            }
+
+            DateTime now = DateTime.UtcNow;
+            var records = new List<PlayerRecord>();
+            foreach (var entry in _data.Players)
+            {
+                var record = entry.Value;
+                if (record.BannedUntil.HasValue && record.BannedUntil.Value > now)
+                    records.Add(record);
+            }
+
+            records.Sort((a, b) => Nullable.Compare(a.BannedUntil, b.BannedUntil));
+            ReplyWithPlayerList(arg, records, page, "Active BeginnerGuard BANs",
+                GetOnlinePlayerIds());
+        }
+
+        private bool TryParsePage(string value, out int page)
+        {
+            if (string.IsNullOrEmpty(value))
+            {
+                page = 1;
+                return true;
+            }
+            return int.TryParse(value, out page) && page > 0;
+        }
+
+        private HashSet<string> GetOnlinePlayerIds()
+        {
+            var result = new HashSet<string>();
+            foreach (var player in BasePlayer.activePlayerList)
+            {
+                if (player != null && player.IsConnected)
+                    result.Add(player.UserIDString);
+            }
+            return result;
+        }
+
+        private void ReplyWithPlayerList(ConsoleSystem.Arg arg, List<PlayerRecord> records,
+            int page, string title, HashSet<string> onlineIds)
+        {
+            int totalPages = Math.Max(1, (records.Count + ListPageSize - 1) / ListPageSize);
+            if (page > totalPages)
+            {
+                arg.ReplyWith($"[BeginnerGuard] Page {page} does not exist (total: {totalPages}).");
+                return;
+            }
+
+            int start = (page - 1) * ListPageSize;
+            int end = Math.Min(start + ListPageSize, records.Count);
+            var lines = new List<string>
+            {
+                $"=== {title} ({records.Count}) — page {page}/{totalPages} ===",
+                "Status | Name | SteamID64 | Steam | Server | Warnings | BAN until (UTC)"
+            };
+
+            for (int i = start; i < end; i++)
+            {
+                var record = records[i];
+                bool online = onlineIds.Contains(record.SteamId);
+                string status = GetManagementStatus(record);
+                string steam = GetSteamHoursForList(record);
+                string banUntil = record.BannedUntil.HasValue && record.BannedUntil.Value > DateTime.UtcNow
+                    ? record.BannedUntil.Value.ToString("yyyy-MM-dd HH:mm")
+                    : "-";
+                lines.Add(
+                    $"{(online ? "ONLINE" : "OFFLINE")}/{status} | " +
+                    $"{record.DisplayName} | {record.SteamId} | {steam} | " +
+                    $"{GetCurrentServerPlaytimeMinutes(record):F1}m | " +
+                    $"{record.PrivateKickCount}/{_config.KickCountBeforeBan} | {banUntil}");
+            }
+
+            if (records.Count == 0) lines.Add("No matching player records.");
+            if (page < totalPages) lines.Add($"Next page: {GetNextPageCommand(title, page + 1)}");
+            arg.ReplyWith(string.Join("\n", lines.ToArray()));
+        }
+
+        private double GetCurrentServerPlaytimeMinutes(PlayerRecord record)
+        {
+            if (!record.LastJoinTime.HasValue) return record.ServerPlaytimeMinutes;
+            return record.ServerPlaytimeMinutes + Math.Max(0.0,
+                (DateTime.UtcNow - record.LastJoinTime.Value).TotalMinutes);
+        }
+
+        private string GetManagementStatus(PlayerRecord record)
+        {
+            if (record.BannedUntil.HasValue && record.BannedUntil.Value > DateTime.UtcNow)
+                return $"BANNED(stage {record.PrivateBanStage})";
+            if (record.LastSteamCheck == DateTime.MinValue) return "UNCHECKED";
+            if (record.IsProfilePrivate) return "UNAVAILABLE";
+
+            bool overLimit = record.SteamTotalMinutes >= 0
+                ? record.SteamTotalMinutes > _config.MaxSteamHours * 60L
+                : record.SteamTotalHours > _config.MaxSteamHours;
+            return overLimit ? "OVER_LIMIT" : "ALLOWED";
+        }
+
+        private string GetSteamHoursForList(PlayerRecord record)
+        {
+            if (record.LastSteamCheck == DateTime.MinValue) return "not checked";
+            if (record.IsProfilePrivate) return "unavailable";
+            return record.SteamTotalMinutes >= 0
+                ? (record.SteamTotalMinutes / 60.0).ToString("0.#") + "h"
+                : record.SteamTotalHours + "h";
+        }
+
+        private string GetNextPageCommand(string title, int page)
+        {
+            if (title == "Active BeginnerGuard BANs") return $"bg.banlist {page}";
+            if (title == "Online managed players") return $"bg.list online {page}";
+            return $"bg.list {page}";
         }
 
         [ConsoleCommand("bg.check")]

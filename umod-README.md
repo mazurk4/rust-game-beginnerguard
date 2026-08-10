@@ -97,6 +97,9 @@ All commands work from the **server console / RCON** without permissions.
 Requires `beginnerguard.admin` when used from the **in-game F1 console**.
 
 - `bg.help` — Show command list
+- `bg.list [page]` — List managed players (20 records per page)
+- `bg.list online [page]` — List managed players who are currently online
+- `bg.banlist [page]` — List active BeginnerGuard BANs
 - `bg.check <SteamID64>` — View a player's stored record
 - `bg.unban <SteamID64>` — Lift an active BAN
 - `bg.forcecheck <SteamID64>` — Force an immediate Steam API check (player must be online)
