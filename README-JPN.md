@@ -85,6 +85,7 @@
 | `BAN duration (seconds)` | `86400` | BAN の長さ（デフォルト: 24時間） |
 | `Private profile BAN grace` | 下記参照 | BAN終了後に公開状態を再確認し、未公開なら長時間BANへ昇格するオプション |
 | `Skip checks for Oxide admins` | `true` | Oxide 管理者を自動で免除する |
+| `Show in-game toast popup for kick/BAN warnings` | `true` | キック/BAN警告をRust標準のトーストポップアップでも表示する。プレイヤーがチャット欄を非表示にしていても見える |
 | `Enable debug logging` | `false` | サーバーコンソールに詳細ログを出力する |
 | `Deferred data save` | `false` | `false` = 変更のたびに即時保存（デフォルト）、`true` = タイマーによる定期保存（大規模サーバー向け） |
 | `Data save interval (seconds)` | `300` | 定期保存の間隔（秒）— `Deferred data save` が `true` のときのみ有効 |

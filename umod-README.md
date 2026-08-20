@@ -64,6 +64,7 @@ Players must make Steam **Game details** public and make total playtime visible.
 - **BAN duration (seconds)** — default `86400` — BAN length (default: 24 hours)
 - **Private profile BAN grace** — disabled by default — Recheck visibility after the initial BAN; if still unavailable, apply the configured escalated BAN duration
 - **Skip checks for Oxide admins** — default `true` — Auto-exempt server admins
+- **Show in-game toast popup for kick/BAN warnings** — default `true` — Also shows kick/BAN warnings as a native Rust toast popup, visible even if the player has hidden the chat window
 - **Enable debug logging** — default `false` — Verbose output to server console
 - **Discord webhook notifications** — default all `false` — Set a Webhook URL and enable only the enforcement stages you want reported
 
