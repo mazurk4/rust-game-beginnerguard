@@ -1,11 +1,14 @@
 {
   "PrivateProfile.GraceWarn": "<color=#FFA500>[BeginnerGuard] Chi tiết trò chơi hoặc tổng thời gian chơi trên Steam của bạn chưa được công khai.\nNếu vẫn không thể kiểm tra, bạn sẽ bị kick sau khoảng {0} phút.\nCách sửa: Steam → Hồ sơ → Chỉnh sửa hồ sơ → Cài đặt quyền riêng tư → đặt Chi tiết trò chơi thành Công khai và bỏ chọn 'Luôn giữ tổng thời gian chơi của tôi ở chế độ riêng tư ngay cả khi người dùng có thể xem chi tiết trò chơi của tôi'.</color>",
+  "PrivateProfile.GraceToast": "[BeginnerGuard] Hồ sơ Steam đang ở chế độ riêng tư — sẽ bị kick sau khoảng {0} phút nếu không sửa.",
   "PrivateProfile.GraceKickReason": "[BeginnerGuard] Đã kick: đạt giới hạn tổng thời gian trên máy chủ.\nHãy công khai Chi tiết trò chơi Steam và tắt tùy chọn ẩn tổng thời gian chơi, sau đó kết nối lại.",
   "PrivateProfile.WarnKick": "<color=#FFA500>[BeginnerGuard] Không thể xem Chi tiết trò chơi hoặc tổng thời gian chơi Steam của bạn!\nHãy công khai trong vòng {0} giây.\nCảnh báo {1}/{2} — vượt quá sẽ bị BAN {3} giờ.\nCách sửa: Steam → Hồ sơ → Chỉnh sửa hồ sơ → Cài đặt quyền riêng tư → Chi tiết trò chơi: Công khai; tùy chọn ẩn tổng thời gian chơi: bỏ chọn.</color>",
+  "PrivateProfile.WarnToast": "[BeginnerGuard] Cảnh báo {1}/{2}: hãy sửa quyền riêng tư Steam trong {0} giây, nếu không sẽ bị BAN {3} giờ.",
   "PrivateProfile.WarnKickReason": "[BeginnerGuard] Đã kick: Chi tiết trò chơi hoặc tổng thời gian chơi Steam đang bị ẩn.\nHãy công khai Chi tiết trò chơi, tắt tùy chọn ẩn tổng thời gian chơi rồi kết nối lại.",
   "PrivateProfile.BanKickReason": "[BeginnerGuard] Bạn đã bị BAN trong {0} giờ.\nLý do: Chi tiết trò chơi hoặc tổng thời gian chơi Steam vẫn bị ẩn sau nhiều lần cảnh báo.\nTrước khi kết nối lại, hãy công khai Chi tiết trò chơi và tắt tùy chọn ẩn tổng thời gian chơi.",
   "PrivateProfile.EscalatedBanKickReason": "[BeginnerGuard] BAN của bạn đã được tăng lên {0} giờ.\nTổng thời gian chơi Steam vẫn không thể kiểm tra sau khi BAN trước hết hạn.\nSteam → Hồ sơ → Chỉnh sửa hồ sơ → Cài đặt quyền riêng tư → Chi tiết trò chơi: Công khai; tùy chọn ẩn tổng thời gian chơi: bỏ chọn.",
   "PrivateProfile.BanConnectKick": "[BeginnerGuard] Bạn đang bị BAN. Thời gian còn lại: {0} giờ {1} phút\nTrước khi kết nối lại, hãy công khai Chi tiết trò chơi Steam và tắt tùy chọn ẩn tổng thời gian chơi.",
   "OverLimit.Warn": "<color=#FFA500>[BeginnerGuard] Máy chủ này chỉ dành cho người mới.\nThời gian chơi Rust trên Steam của bạn: {0} giờ (giới hạn: {1} giờ)\nBạn sẽ bị kick sau {2} giây. Vui lòng chọn máy chủ phù hợp với kinh nghiệm của bạn.</color>",
+  "OverLimit.WarnToast": "[BeginnerGuard] Vượt quá thời gian chơi ({0} giờ / {1} giờ) — kick sau {2} giây.",
   "OverLimit.KickReason": "[BeginnerGuard] Đã kick: vượt quá thời gian chơi ({0} giờ / giới hạn {1} giờ)\nMáy chủ này chỉ dành cho người mới. Cảm ơn bạn đã thông cảm!"
 }

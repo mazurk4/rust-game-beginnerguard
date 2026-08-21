@@ -5,7 +5,7 @@ using Oxide.Core;
 
 namespace Oxide.Plugins
 {
-    [Info("Beginner Guard", "Mazurk4_", "1.7.0")]
+    [Info("Beginner Guard", "Mazurk4_", "1.8.0")]
     [Description("Beginner server protection - restricts players by Rust Steam playtime")]
     public class BeginnerGuard : RustPlugin
     {
@@ -64,6 +64,9 @@ namespace Oxide.Plugins
 
             [JsonProperty("Skip checks for Oxide admins")]
             public bool SkipAdmins { get; set; } = true;
+
+            [JsonProperty("Show in-game toast popup for kick/BAN warnings (visible even if chat is hidden)")]
+            public bool EnableToastWarnings { get; set; } = true;
 
             [JsonProperty("Enable debug logging")]
             public bool DebugLogging { get; set; } = false;
@@ -231,13 +234,16 @@ namespace Oxide.Plugins
             lang.RegisterMessages(new Dictionary<string, string>
             {
                 ["PrivateProfile.GraceWarn"]       = "<color=#FFA500>[BeginnerGuard] Your Steam game details or total playtime are not public.\nYou will be kicked in approximately {0} minute(s) if they remain hidden.\nHow to fix: Steam → Profile → Edit Profile → Privacy Settings → set Game details to Public and uncheck 'Always keep my total playtime private even if users can see my game details'.</color>",
+                ["PrivateProfile.GraceToast"]      = "[BeginnerGuard] Steam profile is private — kick in ~{0} min unless fixed.",
                 ["PrivateProfile.GraceKickReason"] = "[BeginnerGuard] Kicked: cumulative server playtime limit reached.\nSet Steam Game details to Public and uncheck 'Always keep my total playtime private even if users can see my game details', then reconnect.",
                 ["PrivateProfile.WarnKick"]        = "<color=#FFA500>[BeginnerGuard] Your Steam game details or total playtime are hidden!\nPlease make them public within {0}s.\nWarning {1}/{2} — a {3}h BAN will be issued if you exceed this.\nHow to fix: Steam → Profile → Edit Profile → Privacy Settings → Game details: Public; uncheck 'Always keep my total playtime private even if users can see my game details'.</color>",
+                ["PrivateProfile.WarnToast"]       = "[BeginnerGuard] Warning {1}/{2}: fix Steam privacy within {0}s or risk a {3}h BAN.",
                 ["PrivateProfile.WarnKickReason"]  = "[BeginnerGuard] Kicked: Steam game details or total playtime are hidden.\nSet Game details to Public, uncheck the total-playtime privacy option, and reconnect.",
                 ["PrivateProfile.BanKickReason"]   = "[BeginnerGuard] You have been banned for {0} hour(s).\nReason: Steam game details or total playtime remained hidden after repeated warnings.\nSet Game details to Public and uncheck the total-playtime privacy option before reconnecting.",
                 ["PrivateProfile.EscalatedBanKickReason"] = "[BeginnerGuard] Your BAN has been extended to {0} hour(s).\nYour Steam playtime was still unavailable after the previous BAN expired.\nSteam → Profile → Edit Profile → Privacy Settings → Game details: Public; uncheck 'Always keep my total playtime private even if users can see my game details'.",
                 ["PrivateProfile.BanConnectKick"]  = "[BeginnerGuard] You are banned. Ban expires in: {0}h {1}m\nBefore reconnecting, set Steam Game details to Public and uncheck 'Always keep my total playtime private even if users can see my game details'.",
                 ["OverLimit.Warn"]                 = "<color=#FFA500>[BeginnerGuard] This is a beginner-only server.\nYour Rust playtime on Steam: {0}h (limit: {1}h).\nYou will be kicked in {2}s. Please find a server that matches your experience level.</color>",
+                ["OverLimit.WarnToast"]            = "[BeginnerGuard] Playtime over limit ({0}h / {1}h) — kick in {2}s.",
                 ["OverLimit.KickReason"]           = "[BeginnerGuard] Kicked: playtime too high ({0}h / limit {1}h).\nThis server is for beginners only. Thanks for understanding!",
                 ["Status.Exempt"]                  = "[BeginnerGuard] You are exempt from BeginnerGuard checks. Your Steam settings are not evaluated.",
                 ["Status.NotChecked"]              = "[BeginnerGuard] Your Steam status has not been checked yet. Please wait for the automatic check and try /bgstatus again.",
@@ -252,13 +258,16 @@ namespace Oxide.Plugins
             lang.RegisterMessages(new Dictionary<string, string>
             {
                 ["PrivateProfile.GraceWarn"]       = "<color=#FFA500>[BeginnerGuard] Steamのゲーム詳細または総プレイ時間が公開されていません。\nこのまま確認できない場合、約{0}分後にキックされます。\n修正方法: Steam → プロフィール → プロフィールを編集 → プライバシー設定 →「ゲームの詳細」を公開し、「ゲームの詳細が公開中でも総プレイ時間を常に非公開にする」のチェックを外してください。</color>",
+                ["PrivateProfile.GraceToast"]      = "[BeginnerGuard] Steamプロフィールが非公開です。約{0}分後にキックされます。",
                 ["PrivateProfile.GraceKickReason"] = "[BeginnerGuard] キック: サーバー滞在時間の上限に達しました。\nSteamの「ゲームの詳細」を公開し、総プレイ時間を常に非公開にする設定をオフにしてから再接続してください。",
                 ["PrivateProfile.WarnKick"]        = "<color=#FFA500>[BeginnerGuard] Steamのゲーム詳細または総プレイ時間を確認できません！\n{0}秒以内に公開してください。\n警告 {1}/{2} — 超過した場合は{3}時間のBANが適用されます。\n修正方法: Steam → プロフィール → プロフィールを編集 → プライバシー設定 →「ゲームの詳細」を公開し、「ゲームの詳細が公開中でも総プレイ時間を常に非公開にする」のチェックを外してください。</color>",
+                ["PrivateProfile.WarnToast"]       = "[BeginnerGuard] 警告 {1}/{2}：{0}秒以内にSteam公開設定を直してください。超過で{3}時間BAN。",
                 ["PrivateProfile.WarnKickReason"]  = "[BeginnerGuard] キック: Steamのゲーム詳細または総プレイ時間を確認できません。\n「ゲームの詳細」を公開し、総プレイ時間を常に非公開にする設定をオフにしてから再接続してください。",
                 ["PrivateProfile.BanKickReason"]   = "[BeginnerGuard] {0}時間のBANが適用されました。\n理由: 警告後もSteamのゲーム詳細または総プレイ時間を確認できませんでした。\n「ゲームの詳細」を公開し、総プレイ時間を常に非公開にする設定をオフにしてください。",
                 ["PrivateProfile.EscalatedBanKickReason"] = "[BeginnerGuard] BANが{0}時間に延長されました。\n前回のBAN終了後もSteamの総プレイ時間を確認できませんでした。\nSteam → プロフィール → プロフィールを編集 → プライバシー設定 →「ゲームの詳細」を公開し、「ゲームの詳細が公開中でも総プレイ時間を常に非公開にする」のチェックを外してください。",
                 ["PrivateProfile.BanConnectKick"]  = "[BeginnerGuard] BANされています。解除まで: {0}時間{1}分\n再接続前にSteamの「ゲームの詳細」を公開し、「ゲームの詳細が公開中でも総プレイ時間を常に非公開にする」のチェックを外してください。",
                 ["OverLimit.Warn"]                 = "<color=#FFA500>[BeginnerGuard] このサーバーは初心者専用です。\nあなたのRust Steamプレイ時間: {0}時間（上限: {1}時間）\n{2}秒後にキックされます。ご自身の経験に合ったサーバーをお探しください。</color>",
+                ["OverLimit.WarnToast"]            = "[BeginnerGuard] プレイ時間が上限超過（{0}時間/{1}時間）。{2}秒後にキックされます。",
                 ["OverLimit.KickReason"]           = "[BeginnerGuard] キック: プレイ時間が超過しています（{0}時間 / 上限 {1}時間）\nこのサーバーは初心者専用です。ご理解ありがとうございます！",
                 ["Status.Exempt"]                  = "[BeginnerGuard] あなたはBeginnerGuardのチェック免除対象です。Steam設定は判定されません。",
                 ["Status.NotChecked"]              = "[BeginnerGuard] Steam状態はまだ確認されていません。自動チェックを待ってから、もう一度 /bgstatus を実行してください。",
@@ -812,6 +821,7 @@ namespace Oxide.Plugins
                 // Still within grace period — warn and schedule kick at time-limit
                 double remaining = _config.PrivateProfileMaxMinutes - totalMinutes;
                 SendMsg(player, GetMsg("PrivateProfile.GraceWarn", player, remaining.ToString("F0")));
+                ShowToastWarning(player, GetMsg("PrivateProfile.GraceToast", player, remaining.ToString("F0")));
 
                 NotifyDiscord(_config.DiscordWebhook.NotifyGraceStarted,
                     "Private-profile grace period started", player,
@@ -842,6 +852,11 @@ namespace Oxide.Plugins
                 MarkDirty();
 
                 SendMsg(player, GetMsg("PrivateProfile.WarnKick", player,
+                    _config.PrivateProfileKickDelaySeconds.ToString("F0"),
+                    warningNumber,
+                    _config.KickCountBeforeBan,
+                    (_config.BanDurationSeconds / 3600).ToString("F0")));
+                ShowToastWarning(player, GetMsg("PrivateProfile.WarnToast", player,
                     _config.PrivateProfileKickDelaySeconds.ToString("F0"),
                     warningNumber,
                     _config.KickCountBeforeBan,
@@ -897,6 +912,8 @@ namespace Oxide.Plugins
             }
 
             SendMsg(player, GetMsg("OverLimit.Warn", player,
+                hours, _config.MaxSteamHours, _config.OverLimitKickDelaySeconds.ToString("F0")));
+            ShowToastWarning(player, GetMsg("OverLimit.WarnToast", player,
                 hours, _config.MaxSteamHours, _config.OverLimitKickDelaySeconds.ToString("F0")));
 
             ScheduleKick(player, _config.OverLimitKickDelaySeconds,
@@ -1114,6 +1131,16 @@ namespace Oxide.Plugins
         private void SendMsg(BasePlayer player, string msg)
         {
             if (player.IsConnected) player.ChatMessage(msg);
+        }
+
+        // Native Rust toast popup (top-right of screen) — unlike ChatMessage, this is
+        // unaffected by the player's chat-visibility setting, so it's used alongside
+        // SendMsg for kick/BAN warnings players might otherwise miss.
+        private void ShowToastWarning(BasePlayer player, string msg)
+        {
+            if (!_config.EnableToastWarnings) return;
+            if (!player.IsConnected) return;
+            player.SendConsoleCommand("gametip.showtoast", 1, msg, string.Empty, false);
         }
 
         [ChatCommand("bgstatus")]

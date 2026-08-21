@@ -151,6 +151,7 @@ public class BasePlayer
     public static BasePlayer FindByID(ulong id) => null;
     public void Kick(string reason) { }
     public void ChatMessage(string message) { }
+    public void SendConsoleCommand(string command, params object[] args) { }
 }
 
 public static class ConsoleSystem

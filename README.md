@@ -87,6 +87,7 @@ See [`config/BeginnerGuard.json.example`](config/BeginnerGuard.json.example) for
 | `BAN duration (seconds)` | `86400` | How long the BAN lasts (default: 24 h) |
 | `Private profile BAN grace` | See below | Optionally recheck visibility after a BAN and escalate if playtime is still unavailable |
 | `Skip checks for Oxide admins` | `true` | Automatically exempt server admins |
+| `Show in-game toast popup for kick/BAN warnings` | `true` | Also shows kick/BAN warnings as a native Rust toast popup, which is visible even if the player has hidden the chat window |
 | `Enable debug logging` | `false` | Print verbose logs to the server console |
 | `Deferred data save` | `false` | `false` = save on every change (default); `true` = batch writes on a timer (reduces disk IO on busy servers) |
 | `Data save interval (seconds)` | `300` | How often deferred saves are flushed to disk — only used when `Deferred data save` is `true` |

@@ -13,6 +13,7 @@
     "Escalated BAN duration (seconds)": 86400.0
   },
   "Skip checks for Oxide admins": true,
+  "Show in-game toast popup for kick/BAN warnings (visible even if chat is hidden)": true,
   "Enable debug logging": false,
   "Deferred data save (true = periodic timer, false = save on every change)": false,
   "Data save interval (seconds) — used only when Deferred data save is true": 300.0,
